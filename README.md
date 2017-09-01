@@ -1,0 +1,1 @@
+# dnspod_sample
