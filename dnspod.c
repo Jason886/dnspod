@@ -4,10 +4,13 @@
  * TODO: set socket connect timeout.
  */
 
-
+#ifdef MINGW32
+#include <winsock2.h>
+#else
 #include <sys/socket.h> 
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#endif
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +27,14 @@ static int _connect() {
     struct in_addr inaddr;
     struct sockaddr_in addr;
     int sock;
+
+#ifdef MINGW32
+    /* Winsows下启用socket */
+    /* WSADATA wsadata; */
+    if(WSAStartup(MAKEWORD(1,1),&wsadata)==SOCKET_ERROR) {
+        return -1;
+    }
+#endif
 
     inaddr.s_addr = inet_addr(_dns_server);
     memset(&addr, 0x00, sizeof(addr));
@@ -334,14 +345,17 @@ int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, cha
 
     ret = 0;
 ERR:
+#ifdef MINGW32
+    closesocket(sock);
+#else
     close(sock);
+#endif
     if(dn_en) free(dn_en);
     if(dn_en_hex) free(dn_en_hex);
     if(data) free(data);
     return ret;
 }
 
-/*
 int main() {
     int ttl;
     char ip[32];
@@ -369,7 +383,6 @@ int main() {
     
     return 0;
 }
-*/
 
 
 /* =================================================================================== */
@@ -762,7 +775,7 @@ static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, s
     }
 }
 
-int main() {
+int main_test_des() {
     char *input = "helloworldwhatab";
     char *key = "chivox.com";
     char *data2 = 0;
