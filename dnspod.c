@@ -1,7 +1,8 @@
 /*
  * dnspod域名解析服务
  * reflink: https://www.dnspod.cn/
- * TODO: set socket connect timeout.
+ * TODO: 测试在长时间未连接到服务器，是否能够超时返回,超时时间是多少
+ * TODO: 测试在长时间未收到数据时，是否能够超时返回，超时时间是多少
  */
 
 #ifdef _WIN32
