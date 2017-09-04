@@ -698,7 +698,7 @@ static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, s
 }
 
 /*
-int main() {
+int test_des() {
     char *input = "helloworldwhatab";
     char *key = "chivox.com";
     char *data2 = 0;
