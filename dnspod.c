@@ -26,11 +26,15 @@ static int _connect() {
     struct in_addr inaddr;
     struct sockaddr_in addr;
     int sockfd;
-    struct timeval timeout = {30, 0};
+#ifdef _WIN32
+    int timeout = 20000;
+    WSADATA wsadata;
+#else
+    struct timeval timeout = {20, 0};
+#endif
 
 #ifdef _WIN32
     /* Winsows下启用socket */
-    WSADATA wsadata;
     if(WSAStartup(MAKEWORD(1,1),&wsadata)==SOCKET_ERROR) {
         return -1;
     }
@@ -47,9 +51,13 @@ static int _connect() {
         return -1;
     }
 
+#ifdef _WIN32
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
+    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout));
+#else
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
-
+#endif
     if(connect(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
         return -1;
     }
@@ -330,7 +338,7 @@ int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, cha
     }
 
     printf("recv data = %s\n, readed = %d\n", data, readed);
-   
+  
     if(encrypt) {
         parse_data(data, key, &count, &ips, &ttl_rsp);
     }
