@@ -22,12 +22,15 @@
 #include <unistd.h>
 #include <stdint.h>
 
+#ifndef _WIN32
 struct addrinfo;
 extern int getaddrinfo(const char *hostname, const char *service, const struct addrinfo *hints, struct addrinfo **result);
+#endif
 
 #define IP_BUFFER_SIZE 128
 static char *_dnspod_server = "119.29.29.29";
 static int _dnspod_port = 80;
+
 static int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, char *ip_out, int *ttl);
 static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *size_out, char mode);
 
@@ -405,7 +408,7 @@ void test_hex_2_bin() {
 
 int test_dns_pod() {
     int ttl = 0;
-    char ip[32];
+    char ip[IP_BUFFER_SIZE];
     char *key = "weijianliao";
     int key_id = 1;
     int ret = 0;
