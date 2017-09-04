@@ -4,7 +4,7 @@
  * TODO: set socket connect timeout.
  */
 
-#ifdef MINGW32
+#ifdef _WIN32
 #include <winsock2.h>
 #else
 #include <sys/socket.h> 
@@ -29,7 +29,7 @@ static int _connect() {
     struct sockaddr_in addr;
     int sock;
 
-#ifdef MINGW32
+#ifdef _WIN32
     /* Winsows下启用socket */
     WSADATA wsadata;
     if(WSAStartup(MAKEWORD(1,1),&wsadata)==SOCKET_ERROR) {
@@ -346,7 +346,7 @@ int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, cha
 
     ret = 0;
 ERR:
-#ifdef MINGW32
+#ifdef _WIN32
     closesocket(sock);
 #else
     close(sock);
