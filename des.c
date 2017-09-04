@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 #define LB32_MASK   0x00000001
 #define LB64_MASK   0x0000000000000001
@@ -153,7 +154,7 @@ static char iteration_shift[] = {
  * key: 64 bit key for encryption/decryption
  * mode: 'e' = encryption; 'd' = decryption
  */
-uint64_t _des(uint64_t input, uint64_t key, char mode) {
+static uint64_t _des_uint64(uint64_t input, uint64_t key, char mode) {
     
     int i, j;
     
@@ -210,11 +211,11 @@ uint64_t _des(uint64_t input, uint64_t key, char mode) {
     for (i = 0; i< 16; i++) {
         
         /* key schedule */
-        // shifting Ci and Di
+        /* shifting Ci and Di */
         for (j = 0; j < iteration_shift[i]; j++) {
             
-            C = 0x0fffffff & (C << 1) | 0x00000001 & (C >> 27);
-            D = 0x0fffffff & (D << 1) | 0x00000001 & (D >> 27);
+            C = (0x0fffffff & (C << 1)) | (0x00000001 & (C >> 27));
+            D = (0x0fffffff & (D << 1)) | (0x00000001 & (D >> 27));
             
         }
         
@@ -249,25 +250,25 @@ uint64_t _des(uint64_t input, uint64_t key, char mode) {
          * XORing expanded Ri with Ki
          */
         if (mode == 'd') {
-            // decryption
+            /* decryption */
             s_input = s_input ^ sub_key[15-i];
             
         } else {
-            // encryption
+            /* encryption */
             s_input = s_input ^ sub_key[i];
             
         }
         
         /* S-Box Tables */
         for (j = 0; j < 8; j++) {
-            // 00 00 RCCC CR00 00 00 00 00 00 s_input
-            // 00 00 1000 0100 00 00 00 00 00 row mask
-            // 00 00 0111 1000 00 00 00 00 00 column mask
+            /* 00 00 RCCC CR00 00 00 00 00 00 s_input
+               00 00 1000 0100 00 00 00 00 00 row mask
+               00 00 0111 1000 00 00 00 00 00 column mask */
             
-            row = (char) ((s_input & (0x0000840000000000 >> 6*j)) >> 42-6*j);
-            row = (row >> 4) | row & 0x01;
+            row = (char) ((s_input & (0x0000840000000000 >> 6*j)) >> (42-6*j));
+            row = (row >> 4) | (row & 0x01);
             
-            column = (char) ((s_input & (0x0000780000000000 >> 6*j)) >> 43-6*j);
+            column = (char) ((s_input & (0x0000780000000000 >> 6*j)) >> (43-6*j));
             
             s_output <<= 4;
             s_output |= (uint32_t) (S[j][16*row + column] & 0x0f);
@@ -323,7 +324,7 @@ static int _is_big_endian() {
     return *c == 0xFF;
 }
 
-void des(unsigned char in[8], unsigned char k[8], unsigned char out[8], char mode) {
+static void _des(char in[8], char k[8], char out[8], char mode) {
     uint64_t input;
     uint64_t key;
     uint64_t output;
@@ -334,54 +335,86 @@ void des(unsigned char in[8], unsigned char k[8], unsigned char out[8], char mod
         input = _reverse_uint64(input); 
         key = _reverse_uint64(key);
     }
-    output = _des(input, key, mode);
+    output = _des_uint64(input, key, mode);
     if(!_is_big_endian()) {
         output = _reverse_uint64(output);
     }
     *(uint64_t *)(out) = output;
 }
 
-void des_ecb(unsigned char * in, unsigned char key[8], unsigned char ** out, char mode) {
+/*
+ * des_ecb_pkcs5
+ * Need to free '*out' after call this.
+ */
+void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *size_out, char mode) {
     size_t r;
     size_t len;
+    size_t i;
+    char data[8];
+    char * data_out;
 
-    r = strlen(in) % 8;
-    len = strlen(in) + 8 - r;
-    
-    
-    
+    *out = 0;
+    *size_out = 0;
 
-} 
+    if(mode == 'e') {
+        r = size_in % 8;
+        len = size_in + 8 - r;
+        data_out = malloc(len);
+        for(i = 0; i < len; i += 8) {
+            if(i < len-8) {
+                _des(in + i, key, data_out + i, mode);
+            }
+            else {
+                memcpy(data, in + i, r);
+                memset(data + r, 8 - r, 8 - r);
+                _des(data, key, data_out + i, mode);
+            }
+        }
+        *out = data_out;
+        *size_out = len;
+    }
+    else if(mode == 'd') {
+        len = size_in;
+        data_out = malloc(len);
+        for(i = 0; i < len; i+=8) {
+            _des(in + i, key, data_out + i, mode); 
+        }
+        *out = data_out;
+        *size_out = len - data_out[len-1];
+    }
+}
 
 int main() {
-    char *input = "www.google.comed";
-    char *key = "weijianliao";
-    char *data = 0;
+    char *input = "helloworldwhatab";
+    char *key = "chivox.com";
     char *data2 = 0;
-    int r;
-    int i;
+    size_t outsize = 0;
+    char * data3 = 0;
+    size_t data3size = 0;
+    size_t i;
 
-    r = strlen(input) % 8;
+    printf("input = %s\n", input);
+    des_ecb_pkcs5(input, strlen(input), key, &data2, &outsize, 'e');
 
-    data = malloc(strlen(input) + 8 - r);
-    data2 = malloc(strlen(input) + 8 - r);
-    memcpy(data, input, strlen(input));
-    for(i=strlen(input); i< strlen(input) + 8-r; i++) {
-        data[i] = 8-r;
-    }
-
-    for(i=0; i< strlen(input) + 8-r; i+=8) {
-        des(data+i, key, data2+i, 'e');
-    }
-
-    printf("output = ");
-    for(i=0; i< strlen(input) + 8 -r; i++) {
+    printf("outsize = %ld\n", outsize);
+    for(i = 0; i < outsize; i++) {
         printf("%02X ", (uint8_t) (data2[i]));
     }
     printf("\n");
 
+    des_ecb_pkcs5(data2, outsize, key, &data3, &data3size, 'd'); 
+    printf("data3size = %ld\n", data3size);
+    for(i = 0; i < data3size; i++) {
+        printf("%02X ", (uint8_t) (data3[i]));
+    }
+
+    data3[data3size] = 0;
+    printf("data3 = %s\n", data3);
+    printf("\n");
+
+    free(data2);
+    free(data3);
     return 0;
 }
-
 
 
