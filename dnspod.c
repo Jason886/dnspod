@@ -30,7 +30,7 @@ static int _connect() {
 
 #ifdef MINGW32
     /* Winsows下启用socket */
-    /* WSADATA wsadata; */
+    WSADATA wsadata;
     if(WSAStartup(MAKEWORD(1,1),&wsadata)==SOCKET_ERROR) {
         return -1;
     }
