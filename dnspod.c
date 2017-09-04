@@ -62,6 +62,9 @@ static int _connect() {
         return -1;
     }
 
+    sleep(10);
+    printf("sleep ok");
+
     return sockfd;
 }
 
