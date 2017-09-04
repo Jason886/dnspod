@@ -391,12 +391,15 @@ void test_hex_2_bin() {
 }
 
 int test_dns_pod() {
-    int ttl;
+    int ttl = 0;
     char ip[32];
     char *key = "chivox.com";
     int key_id = 0;
+    int ret = 0;
 
-    dns_pod("www.baidu.com", 0, 0, key_id, key, ip, &ttl);
+    memset(ip, 0x00, sizeof(ip));
+    ret = dns_pod("www.baidu.com", 0, 0, key_id, key, ip, &ttl);
+    printf("ret = %d\n", ret);
     printf("ip = %s\n", ip);
     printf("\n");
     
