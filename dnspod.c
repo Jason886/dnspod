@@ -7,9 +7,11 @@
 
 #ifdef _WIN32
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #else
 #include <sys/time.h>
 #include <sys/socket.h> 
+#include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #endif
@@ -20,10 +22,43 @@
 #include <unistd.h>
 #include <stdint.h>
 
-static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *size_out, char mode);
+struct addrinfo;
+extern int getaddrinfo(const char *hostname, const char *service, const struct addrinfo *hints, struct addrinfo **result);
 
+#define IP_BUFFER_SIZE 128
 static char *_dnspod_server = "119.29.29.29";
 static int _dnspod_port = 80;
+static int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, char *ip_out, int *ttl);
+static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *size_out, char mode);
+
+int aiengine_getaddrinfo(const char *hostname, const char *service, const struct addrinfo *hints, struct addrinfo **result) {
+    char ip[IP_BUFFER_SIZE];
+    int isIP = 1;
+    int i = 0;
+    int ret = 0;
+
+    isIP = 1;
+    for(i=0; i<strlen(hostname); i++) {
+        if(hostname[i] == ':') { /* 认为传入的是IPv6地址 */
+            isIP = 1;
+            break;
+        }
+        if(hostname[i] != '.' && hostname[i] < '0' && hostname[i] > '9') {
+            isIP = 0;
+        }
+    }
+
+    if(isIP) {
+        return getaddrinfo(hostname, service, hints, result);
+    }
+
+    memset(ip, 0x00, sizeof(ip));
+    ret = dns_pod((char *)hostname, 0, 0, 0, 0, ip, 0);
+    if(ret < 0 || strlen(ip) == 0) {
+        return getaddrinfo(hostname, service, hints, result);
+    }
+    return getaddrinfo(ip, service, hints, result);
+}
 
 static int _connect() {
     struct in_addr inaddr;
@@ -213,8 +248,7 @@ next_tok:
     if(body_de) free(body_de);
 }
 
-#define IP_OUT_SIZE 32
-int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, char *ip_out, int *ttl) {
+static int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, char *ip_out, int *ttl) {
     int sock = -1;
     char *fmt;
     char *dn_en = 0;
@@ -324,9 +358,9 @@ int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, cha
     }
 
     printf("count = %d\n", count);
-    memset(ip_out, 0x00, IP_OUT_SIZE);
+    memset(ip_out, 0x00, IP_BUFFER_SIZE);
     if(ips && count > 0) {
-       strncpy(ip_out, (char *)(((char**)(ips))[0]), IP_OUT_SIZE-1);
+       strncpy(ip_out, (char *)(((char**)(ips))[0]), IP_BUFFER_SIZE-1);
     }
     if(ips) free_ips(ips, count);
     if(ttl) *ttl = ttl_rsp;
@@ -343,6 +377,8 @@ ERR:
     if(data) free(data);
     return ret;
 }
+
+#ifdef __TEST
 
 void test_hex_2_bin() {
     char * test_hex = "ABCDEF0123456789abcdef";
@@ -420,6 +456,7 @@ int main() {
     test_dns_pod();
     return 0;
 }
+#endif
 
 /* =================================================================================== */
 /*                             DES                                                     */
