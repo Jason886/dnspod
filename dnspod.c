@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *size_out, char mode);
 
@@ -48,32 +49,44 @@ static void hex_2_bin(char *hex, size_t size, char *bin) {
     size_t i;
     char a, b;
     for(i=0; i < size; i+=2) {
-        a = (hex[i] >= '0' && hex[i] <= '9') ? (hex[i] - '0') : 
+        a = hex[i];
+        a = (a >= '0' && a <= '9') ? (a - '0') : 
             (
-            (hex[i] >= 'A' && hex[i] <= 'F') ? (hex[i] - 'A' + 10) : (hex[i] - 'a' + 10)
+             (a >= 'A' && a <= 'F') ? (a - 'A' + 10) : (a - 'a' + 10)
             );
-        b = (hex[i+1] >= '0' && hex[i+1] <= '9') ? (hex[i+1] - '0') : 
+        b = hex[i+1];
+        b = (b >= '0' && b <= '9') ? (b - '0') : 
             (
-            (hex[i+1] >= 'A' && hex[i+1] <= 'F') ? (hex[i+1] - 'A' + 10) : (hex[i+1] - 'a' + 10)
+             (b >= 'A' && b <= 'F') ? (b - 'A' + 10) : (b - 'a' + 10)
             );
-        bin[i/2] = (a<<16) + b;
+        bin[i/2] = (a<<4) + b;
     }
 }
 
-static void bin_2_hex(char *bin, size_t size, char *hex) {
+static void bin_2_hex(char *bin, size_t size, char *hex, int upper) {
     size_t i;
+    char a;
     for(i=0; i < size; i++) {
-        sprintf(hex, "%02X", (uint8_t)(bin[i])); 
+        a = (bin[i] >> 4) & 0x0F;
+        hex[i*2] = (a >= 0 && a <= 9) ? (a + '0') :
+            (upper ? (a - 10 + 'A') : (a - 10 + 'a'));
+
+        a = (bin[i]) & 0x0F;
+        hex[i*2+1] = (a >= 0 && a <= 9) ? (a + '0') :
+            (upper ? (a - 10 + 'A') : (a - 10 + 'a'));
     }
 }
 
-static int parse_data(char *data, int *count, char ***ips, int *ttl) {
+static void parse_data(char *data, char * key, int *count, char ***ips, int *ttl) {
     const int STATUS = 0;
     const int HEADER = 1;
     const int BODY = 2;
     int state = STATUS;
     char * line = 0;
     char * body = 0;
+    char * body_bin = 0;
+    char * body_de = 0;
+    size_t body_de_size = 0;
     char * ip_str = 0;
     char * ttl_str = 0;
     char * tok = 0;
@@ -89,7 +102,7 @@ static int parse_data(char *data, int *count, char ***ips, int *ttl) {
     while(line != 0) {
         if(state == STATUS) {
             if(strstr(line, "200 ") == 0) {
-                return -1;
+                return;
             }
             state = HEADER;
             goto next;
@@ -111,77 +124,90 @@ next:
         line = strtok(0, "\n");
     }
 
-    if(body && strlen(body) > 0) {
-        printf("body = %s\n", body);
-
-        ip_str = strtok(body, ",");
-        printf("ip_str = %s\n", ip_str);
-        ttl_str = strtok(0, ",");
-        printf("ttl_str = %s\n", ttl_str);
-
-        if(ip_str) {
-            tok = strtok(ip_str, ";");
-            printf("tok = %s\n", tok);
-            while(tok != 0) {
-                if(count) {
-                    (*count)++;
-                    
-                    if(*count == 1) {
-                        *ips = malloc((*count)*sizeof(char *));
-                        if(!(*ips))
-                        {
-                            *count = 0;
-                            goto next_tok;
-                        }
-                    }
-                    else {
-                        printf("realloc\n");
-                        tmp = realloc(*ips, (*count)*sizeof(char *));
-                        printf("tmp = %p\n", tmp);
-                        if(!tmp) {
-                            printf("in it\n");
-                            (*count)--;
-                            goto next_tok;
-                        }
-                        printf("out it\n");
-                        *ips = tmp;
-                    }
-                    str_dup = malloc(strlen(tok) +1);
-                    strcpy(str_dup, tok);
-                    ((char **)(*ips))[(*count)-1] = str_dup;
-                    
-                }
-next_tok:
-                tok = strtok(0, ";");
-                printf("tok = %s\n", tok);
-            }
-
-            printf("*count = %d\n", *count);
-
-            for(i=0; i < *count; i++) {
-                char * ip = (char *)(((char **)(*ips))[i]);
-                printf("ip = %s\n", ip);
-            }
-        }
-
-        return 0;
+    if(!body || strlen(body) == 0) {
+        return;
     }
 
-    return -1;
+    if(key) {
+        body_bin = malloc(strlen(body)/2+1);
+        if(!body_bin) return;
+        hex_2_bin(body, strlen(body)/2+1, body_bin);
+        des_ecb_pkcs5(body_bin, strlen(body)/2, key, &body_de, &body_de_size, 'd');
+        free(body_bin);
+        body_de[body_de_size] = 0;
+        body = body_de;
+    }
+
+    printf("body = %s\n", body);
+
+    ip_str = strtok(body, ",");
+    printf("ip_str = %s\n", ip_str);
+    ttl_str = strtok(0, ",");
+    printf("ttl_str = %s\n", ttl_str);
+
+    if(ip_str) {
+        tok = strtok(ip_str, ";");
+        printf("tok = %s\n", tok);
+        while(tok != 0) {
+            if(count) {
+                (*count)++;
+                
+                if(*count == 1) {
+                    *ips = malloc((*count)*sizeof(char *));
+                    if(!(*ips))
+                    {
+                        *count = 0;
+                        goto next_tok;
+                    }
+                }
+                else {
+                    printf("realloc\n");
+                    tmp = realloc(*ips, (*count)*sizeof(char *));
+                    printf("tmp = %p\n", tmp);
+                    if(!tmp) {
+                        printf("in it\n");
+                        (*count)--;
+                        goto next_tok;
+                    }
+                    printf("out it\n");
+                    *ips = tmp;
+                }
+                str_dup = malloc(strlen(tok) +1);
+                strcpy(str_dup, tok);
+                ((char **)(*ips))[(*count)-1] = str_dup;
+                
+            }
+next_tok:
+            tok = strtok(0, ";");
+            printf("tok = %s\n", tok);
+        }
+
+        printf("*count = %d\n", *count);
+
+        for(i=0; i < *count; i++) {
+            char * ip = (char *)(((char **)(*ips))[i]);
+            printf("ip = %s\n", ip);
+        }
+    }
+
+    if(body_de) free(body_de);
 }
 
 #define IP_OUT_SIZE 32
 int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, char *ip_out/*size=32*/, int *ttl) {
-    int sock;
+    int sock = -1;
     char *fmt;
-    char *dn_en;
-    size_t dn_en_size;
+    char *dn_en = 0;
+    char *dn_en_hex = 0;
+    size_t dn_en_size = 0;
     char buff[4096];
-    char * data;
+    char * data = 0;
     int total, nsend, sended, nread, readed;
     int count;
-    char **ips;
+    char **ips = 0;
     int ttl_rsp;
+    int ret = -1;
+    char *tmp = 0;
 
     sock = _connect();
     if(sock < 0) {
@@ -191,30 +217,28 @@ int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, cha
     if(local_ip && strlen(local_ip) > 0) {
         if(ttl) {
             if(encrypt) {
-                fmt = "GET /d?dn=%s&ip=%s&id=%d&ttl=1 HTTP/1.1\r\n"
-                    "\r\n";
+                fmt = "GET /d?dn=%s&ip=%s&id=%d&ttl=1 HTTP/1.1\r\n" "\r\n";
             }
             else {
-                fmt = "GET /d?dn=%s&ip=%s&ttl=1 HTTP/1.1\r\n"
-                    "\r\n";
+                fmt = "GET /d?dn=%s&ip=%s&ttl=1 HTTP/1.1\r\n" "\r\n";
             }
         }
         else {
             if(encrypt) {
-                fmt = "GET /d?dn=%s&ip=%s&id=%d HTTP/1.1\r\n"
-                    "\r\n";
+                fmt = "GET /d?dn=%s&ip=%s&id=%d HTTP/1.1\r\n" "\r\n";
             }
             else {
-                fmt = "GET /d?dn=%s&ip=%s HTTP/1.1\r\n"
-                    "\r\n";
+                fmt = "GET /d?dn=%s&ip=%s HTTP/1.1\r\n" "\r\n";
             }
         }
         if(encrypt) {
             des_ecb_pkcs5(dn, strlen(dn), key, &dn_en, &dn_en_size, 'e');
-            if(dn_en) {
-                snprintf((char *)buff, sizeof(buff), (const char *)fmt, dn_en, local_ip, key_id);
-                free(dn_en);
-            }
+            if(!dn_en) goto ERR;
+            dn_en_hex = malloc(dn_en_size*2+1);
+            if(!dn_en_hex) goto ERR;
+            memset(dn_en_hex, 0x00, dn_en_size*2+1); 
+            bin_2_hex(dn_en, dn_en_size, dn_en_hex, 1); 
+            snprintf((char *)buff, sizeof(buff), (const char *)fmt, dn_en_hex, local_ip, key_id);
         }
         else {
             snprintf(buff, sizeof(buff), fmt, dn, local_ip);
@@ -223,30 +247,28 @@ int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, cha
     else {
         if(ttl) {
             if(encrypt) {
-                fmt = "GET /d?dn=%s&id=%d&ttl=1 HTTP/1.1\r\n"
-                    "\r\n";
+                fmt = "GET /d?dn=%s&id=%d&ttl=1 HTTP/1.1\r\n" "\r\n";
             }
             else {
-                fmt = "GET /d?dn=%s&ttl=1 HTTP/1.1\r\n"
-                    "\r\n";
+                fmt = "GET /d?dn=%s&ttl=1 HTTP/1.1\r\n" "\r\n";
             }
         }
         else {
             if(encrypt) {
-                fmt = "GET /d?dn=%s&id=%d HTTP/1.1\r\n"
-                    "\r\n";
+                fmt = "GET /d?dn=%s&id=%d HTTP/1.1\r\n" "\r\n";
             }
             else {
-                fmt = "GET /d?dn=%s HTTP/1.1\r\n"
-                    "\r\n";
+                fmt = "GET /d?dn=%s HTTP/1.1\r\n" "\r\n";
             }
         }
         if(encrypt) {
             des_ecb_pkcs5(dn, strlen(dn), key, &dn_en, &dn_en_size, 'e');
-            if(dn_en) {
-                snprintf(buff, sizeof(buff), fmt, dn, key_id);
-                free(dn_en);
-            }
+            if(!dn_en) goto ERR;
+            dn_en_hex = malloc(dn_en_size*2+1);
+            if(!dn_en_hex) goto ERR;
+            memset(dn_en_hex, 0x00, dn_en_size*2+1); 
+            bin_2_hex(dn_en, dn_en_size, dn_en_hex, 1); 
+            snprintf(buff, sizeof(buff), fmt, dn_en_hex, key_id);
         }
         else {
             snprintf(buff, sizeof(buff), fmt, dn);
@@ -260,7 +282,7 @@ int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, cha
     while(sended < total) {
         nsend = send(sock, buff+sended, total-sended, 0);
         if(nsend < 0) {
-            return -1;
+            goto ERR;
         }
         sended +=nsend;
     }
@@ -274,18 +296,26 @@ int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, cha
             break;
         }
         if(data) {
-            data = realloc(data, readed + nread); 
+            tmp = realloc(data, readed + nread); 
+            if(!tmp) goto ERR;
+            data = tmp;
         }
         else {
             data = malloc(nread);
+            if(!data) goto ERR;
         }
         memcpy(data+readed, buff, nread);
         readed +=nread;
     }
 
     printf("recv data = %s\n, readed = %d\n", data, readed);
-    
-    parse_data(data, &count, &ips, &ttl_rsp);
+   
+    if(encrypt) {
+        parse_data(data, key, &count, &ips, &ttl_rsp);
+    }
+    else {
+        parse_data(data, 0,  &count, &ips, &ttl_rsp);
+    }
 
     memset(ip_out, 0x00, IP_OUT_SIZE);
     if(ips && count > 0) {
@@ -295,15 +325,40 @@ int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, cha
 
     free_ips(ips, count);
 
-    free(data);
-    return 0;
+    ret = 0;
+ERR:
+    close(sock);
+    if(dn_en) free(dn_en);
+    if(dn_en_hex) free(dn_en_hex);
+    if(data) free(data);
+    return ret;
 }
 
 int main() {
     int ttl;
     char ip[32];
+    char * test_hex = "ABCDEF0123456789abcdef";
+    char bin[40];
+    char hex[100];
+    int i;
     dns_pod("www.baidu.com", 0, 0, key_id, key, ip, &ttl);
     printf("ip = %s\n", ip);
+    memset(bin, 0x00, sizeof(bin));
+    hex_2_bin(test_hex, strlen(test_hex), bin);
+    for(i=0; i<40; i++) {
+        printf("%02X ", (uint8_t) bin[i]);
+    }
+    printf("\n");
+    memset(hex, 0x00, sizeof(hex));
+    bin_2_hex(bin, 11, hex, 1);
+    hex[22] = 0;
+    printf("hex = %s\n", hex);
+    memset(hex, 0x00, sizeof(hex));
+    bin_2_hex(bin, 11, hex, 0);
+    hex[22] = 0;
+    printf("hex = %s\n", hex);
+    
+    
     return 0;
 }
 
