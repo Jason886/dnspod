@@ -341,6 +341,7 @@ ERR:
     return ret;
 }
 
+/*
 int main() {
     int ttl;
     char ip[32];
@@ -368,6 +369,7 @@ int main() {
     
     return 0;
 }
+*/
 
 
 /* =================================================================================== */
@@ -696,6 +698,7 @@ static uint64_t _reverse_uint64( uint64_t a ) {
 static int _is_big_endian() {
     uint16_t a = 0xFF00;
     uint8_t *c = (uint8_t *)&a;
+    printf("big_endian = %d\n", *c == 0xFF);
     return *c == 0xFF;
 }
 
@@ -759,8 +762,7 @@ static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, s
     }
 }
 
-/*
-int test_des() {
+int main() {
     char *input = "helloworldwhatab";
     char *key = "chivox.com";
     char *data2 = 0;
@@ -792,4 +794,3 @@ int test_des() {
     free(data3);
     return 0;
 }
-*/
