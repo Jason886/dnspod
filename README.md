@@ -1,4 +1,4 @@
-# dnspod域名解析服务
+# 封装dnspod域名解析服务
 reflink: https://www.dnspod.cn/
 
 build:
