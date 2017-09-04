@@ -3,8 +3,8 @@ reflink: https://www.dnspod.cn/
 
 build:
 1.linux:
-    gcc dnspod.c
+    gcc -D__TEST -std=c89 -pedantic -Wall dnspod.c
 2.mac:
-    gcc dnspod.c
+    gcc -D__TEST -std=c89 -pedantic -Wall dnspod.c
 3.win:(need mingw)
-    gcc -D_WIN32 dnspod.c -l wsock32
+    gcc -D__TEST -D_WIN32 -pedantic -Wall dnspod.c -l wsock32 -lWs2_32
