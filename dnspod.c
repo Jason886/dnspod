@@ -1,3 +1,9 @@
+/*
+ * dnspod域名解析服务
+ * reflink: https://www.dnspod.cn/
+ */
+
+
 #include <sys/socket.h> 
 #include <netinet/in.h>
 #include <arpa/inet.h>
