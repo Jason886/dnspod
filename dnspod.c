@@ -19,15 +19,14 @@
 
 static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *size_out, char mode);
 
-static char * _dns_server = "119.29.29.29";
-static int _dns_port = 80;
-static char *key = "chivox.com";
-static int key_id = 0;
+static char *_dnspod_server = "119.29.29.29";
+static int _dnspod_port = 80;
 
 static int _connect() {
     struct in_addr inaddr;
     struct sockaddr_in addr;
-    int sock;
+    int sockfd;
+    struct timeval timeout = {30, 0};
 
 #ifdef _WIN32
     /* Winsows下启用socket */
@@ -37,22 +36,25 @@ static int _connect() {
     }
 #endif
 
-    inaddr.s_addr = inet_addr(_dns_server);
+    inaddr.s_addr = inet_addr(_dnspod_server);
     memset(&addr, 0x00, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(_dns_port);
+    addr.sin_port = htons(_dnspod_port);
     addr.sin_addr = inaddr;
 
-    sock = socket(PF_INET, SOCK_STREAM, 0);
-    if(sock < 0) {
+    sockfd = socket(PF_INET, SOCK_STREAM, 0);
+    if(sockfd < 0) {
         return -1;
     }
 
-    if(connect(sock, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+
+    if(connect(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
         return -1;
     }
 
-    return sock;
+    return sockfd;
 }
 
 static void free_ips(char **ips, int count) {
@@ -357,34 +359,78 @@ ERR:
     return ret;
 }
 
-int main() {
-    int ttl;
-    char ip[32];
+void test_hex_2_bin() {
     char * test_hex = "ABCDEF0123456789abcdef";
     char bin[40];
     char hex[100];
     int i;
-    dns_pod("www.baidu.com", 0, 0, key_id, key, ip, &ttl);
-    printf("ip = %s\n", ip);
+
     memset(bin, 0x00, sizeof(bin));
     hex_2_bin(test_hex, strlen(test_hex), bin);
     for(i=0; i<40; i++) {
         printf("%02X ", (uint8_t) bin[i]);
     }
-    printf("\n");
+
     memset(hex, 0x00, sizeof(hex));
     bin_2_hex(bin, 11, hex, 1);
     hex[22] = 0;
     printf("hex = %s\n", hex);
+    
     memset(hex, 0x00, sizeof(hex));
     bin_2_hex(bin, 11, hex, 0);
     hex[22] = 0;
     printf("hex = %s\n", hex);
-    
+}
+
+int test_dns_pod() {
+    int ttl;
+    char ip[32];
+    char *key = "chivox.com";
+    int key_id = 0;
+
+    dns_pod("www.baidu.com", 0, 0, key_id, key, ip, &ttl);
+    printf("ip = %s\n", ip);
+    printf("\n");
     
     return 0;
 }
 
+int test_des() {
+    char *input = "helloworldwhatab";
+    char *key = "chivox.com";
+    char *data2 = 0;
+    size_t outsize = 0;
+    char * data3 = 0;
+    size_t data3size = 0;
+    size_t i;
+
+    printf("input = %s\n", input);
+    des_ecb_pkcs5(input, strlen(input), key, &data2, &outsize, 'e');
+
+    printf("outsize = %ld\n", outsize);
+    for(i = 0; i < outsize; i++) {
+        printf("%02X ", (uint8_t) (data2[i]));
+    }
+    printf("\n");
+
+    des_ecb_pkcs5(data2, outsize, key, &data3, &data3size, 'd'); 
+    printf("data3size = %ld\n", data3size);
+    for(i = 0; i < data3size; i++) {
+        printf("%02X ", (uint8_t) (data3[i]));
+    }
+
+    data3[data3size] = 0;
+    printf("data3 = %s\n", data3);
+    printf("\n");
+
+    free(data2);
+    free(data3);
+    return 0;
+}
+
+int main() {
+    test_dns_pod();
+}
 
 /* =================================================================================== */
 /*                             DES                                                     */
@@ -696,7 +742,7 @@ static uint64_t _des_uint64(uint64_t input, uint64_t key, char mode) {
 }
 
 
-static uint64_t _reverse_uint64( uint64_t a ) {
+static uint64_t _reverse_uint64(uint64_t a) {
     uint64_t b = 0;
     b |= (a >> 56) & 0x00000000000000FF;
     b |= (a << 56) & 0xFF00000000000000;
@@ -712,8 +758,7 @@ static uint64_t _reverse_uint64( uint64_t a ) {
 static int _is_big_endian() {
     uint16_t a = 0xFF00;
     uint8_t *c = (uint8_t *)&a;
-    printf("big_endian = %d\n", *c == 0xFF);
-    return *c == 0xFF;
+    return (*c) == 0xFF;
 }
 
 static void _des(char in[8], char k[8], char out[8], char mode) {
@@ -721,8 +766,8 @@ static void _des(char in[8], char k[8], char out[8], char mode) {
     uint64_t key;
     uint64_t output;
     
-    input = *(uint64_t *)(in);
-    key = *(uint64_t *)(k);
+    input = *(uint64_t *)in;
+    key = *(uint64_t *)k;
     if(!_is_big_endian()) {
         input = _reverse_uint64(input); 
         key = _reverse_uint64(key);
@@ -731,14 +776,14 @@ static void _des(char in[8], char k[8], char out[8], char mode) {
     if(!_is_big_endian()) {
         output = _reverse_uint64(output);
     }
-    *(uint64_t *)(out) = output;
+    *(uint64_t *)out = output;
 }
 
 /*
  * des_ecb_pkcs5
  * Need to free '*out' after call this.
  */
-static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *size_out, char mode) {
+static void des_ecb_pkcs5(char *in, size_t size_in, char key[8], char **out, size_t *size_out, char mode) {
     size_t r;
     size_t len;
     size_t i;
@@ -750,15 +795,15 @@ static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, s
 
     if(mode == 'e') {
         r = size_in % 8;
-        len = size_in + 8 - r;
+        len = size_in + 8-r;
         data_out = malloc(len);
-        for(i = 0; i < len; i += 8) {
+        for(i = 0; i < len; i+=8) {
             if(i < len-8) {
                 _des(in + i, key, data_out + i, mode);
             }
             else {
                 memcpy(data, in + i, r);
-                memset(data + r, 8 - r, 8 - r);
+                memset(data + r, 8-r, 8-r);
                 _des(data, key, data_out + i, mode);
             }
         }
@@ -776,35 +821,3 @@ static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, s
     }
 }
 
-int main_test_des() {
-    char *input = "helloworldwhatab";
-    char *key = "chivox.com";
-    char *data2 = 0;
-    size_t outsize = 0;
-    char * data3 = 0;
-    size_t data3size = 0;
-    size_t i;
-
-    printf("input = %s\n", input);
-    des_ecb_pkcs5(input, strlen(input), key, &data2, &outsize, 'e');
-
-    printf("outsize = %ld\n", outsize);
-    for(i = 0; i < outsize; i++) {
-        printf("%02X ", (uint8_t) (data2[i]));
-    }
-    printf("\n");
-
-    des_ecb_pkcs5(data2, outsize, key, &data3, &data3size, 'd'); 
-    printf("data3size = %ld\n", data3size);
-    for(i = 0; i < data3size; i++) {
-        printf("%02X ", (uint8_t) (data3[i]));
-    }
-
-    data3[data3size] = 0;
-    printf("data3 = %s\n", data3);
-    printf("\n");
-
-    free(data2);
-    free(data3);
-    return 0;
-}
