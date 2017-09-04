@@ -374,7 +374,7 @@ int test_dns_pod() {
     int ret = 0;
 
     memset(ip, 0x00, sizeof(ip));
-    ret = dns_pod("www.google.com", 0, 1, key_id, key, ip, 0);
+    ret = dns_pod("www.google.com", 0, 0, key_id, key, ip, 0);
     printf("ret = %d\n", ret);
     printf("ip = %s\n", ip);
     printf("\n");
