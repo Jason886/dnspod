@@ -22,10 +22,12 @@
 #include <unistd.h>
 #include <stdint.h>
 
+/*
 #ifndef _WIN32
 struct addrinfo;
 extern int getaddrinfo(const char *hostname, const char *service, const struct addrinfo *hints, struct addrinfo **result);
 #endif
+*/
 
 #define IP_BUFFER_SIZE 128
 static char *_dnspod_server = "119.29.29.29";
