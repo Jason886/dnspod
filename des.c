@@ -343,10 +343,10 @@ static void _des(char in[8], char k[8], char out[8], char mode) {
 }
 
 /*
- * des_ecb_pkcs5
+ * chivox_des_ecb_pkcs5
  * Need to free '*out' after call this.
  */
-void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *size_out, char mode) {
+void chivox_des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *size_out, char mode) {
     size_t r;
     size_t len;
     size_t i;
@@ -384,6 +384,7 @@ void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *
     }
 }
 
+/*
 int main() {
     char *input = "helloworldwhatab";
     char *key = "chivox.com";
@@ -394,7 +395,7 @@ int main() {
     size_t i;
 
     printf("input = %s\n", input);
-    des_ecb_pkcs5(input, strlen(input), key, &data2, &outsize, 'e');
+    chivox_des_ecb_pkcs5(input, strlen(input), key, &data2, &outsize, 'e');
 
     printf("outsize = %ld\n", outsize);
     for(i = 0; i < outsize; i++) {
@@ -402,7 +403,7 @@ int main() {
     }
     printf("\n");
 
-    des_ecb_pkcs5(data2, outsize, key, &data3, &data3size, 'd'); 
+    chivox_des_ecb_pkcs5(data2, outsize, key, &data3, &data3size, 'd'); 
     printf("data3size = %ld\n", data3size);
     for(i = 0; i < data3size; i++) {
         printf("%02X ", (uint8_t) (data3[i]));
@@ -416,5 +417,5 @@ int main() {
     free(data3);
     return 0;
 }
-
+*/
 
