@@ -8,6 +8,10 @@
     #include <winsock2.h>
     #include <windows.h>
     #include <ws2tcpip.h>
+
+    #define strcasecmp _stricmp
+    //#define strdup _strdup
+    #define sscanf sscanf_s
 #else
     #include <sys/socket.h>
     #include <netinet/in.h>
