@@ -5,6 +5,12 @@
  * TODO: 测试在长时间未收到数据时，是否能够超时返回，超时时间是多少
  */
 
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdint.h>
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -16,11 +22,6 @@
 #include <arpa/inet.h>
 #endif
 
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdint.h>
 
 /*
 #ifndef _WIN32
@@ -36,7 +37,8 @@ static int _dnspod_port = 80;
 static int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, char *ip_out, int *ttl);
 static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *size_out, char mode);
 
-int aiengine_getaddrinfo(const char *hostname, const char *service, const struct addrinfo *hints, struct addrinfo **result) {
+int aiengine_getaddrinfo(const char *hostname, const char *service, \
+        const struct addrinfo *hints, struct addrinfo **result) {
     char ip[IP_BUFFER_SIZE];
     int isIP = 1;
     int i = 0;
@@ -69,18 +71,21 @@ static int _connect() {
     struct in_addr inaddr;
     struct sockaddr_in addr;
     int sockfd;
+
 #ifdef _WIN32
-    int timeout = 5000;
+    int timeout = 15000;
     WSADATA wsadata;
 #else
-    struct timeval timeout = {5, 0};
+    struct timeval timeout = {15, 0};
 #endif
 
 #ifdef _WIN32
     /* Winsows下启用socket */
+    /*
     if(WSAStartup(MAKEWORD(1,1),&wsadata)==SOCKET_ERROR) {
         return -1;
     }
+    */
 #endif
 
     inaddr.s_addr = inet_addr(_dnspod_server);
@@ -101,6 +106,7 @@ static int _connect() {
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 #endif
+
     if(connect(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
         return -1;
     }
