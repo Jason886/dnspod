@@ -22,6 +22,7 @@
     #include <arpa/inet.h>
 #endif
 
+#include "http.c"
 #include "des.c"
 
 

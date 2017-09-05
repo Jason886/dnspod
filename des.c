@@ -323,7 +323,7 @@ static int _is_big_endian() {
     return (*c) == 0xFF;
 }
 
-static void _des(char in[8], char k[8], char out[8], char mode) {
+static void _des_byte8(char in[8], char k[8], char out[8], char mode) {
     uint64_t input;
     uint64_t key;
     uint64_t output;
@@ -341,11 +341,43 @@ static void _des(char in[8], char k[8], char out[8], char mode) {
     *(uint64_t *)out = output;
 }
 
-/*
- * des_ecb_pkcs5
- * Need to free 'out' after call this.
+static void hex_to_bin(char *hex, size_t size, char *bin) {
+    size_t i;
+    char a, b;
+    for(i=0; i < size; i+=2) {
+        a = hex[i];
+        a = (a >= '0' && a <= '9') ? (a - '0') : 
+            (
+             (a >= 'A' && a <= 'F') ? (a - 'A' + 10) : (a - 'a' + 10)
+            );
+
+        b = hex[i+1];
+        b = (b >= '0' && b <= '9') ? (b - '0') : 
+            (
+             (b >= 'A' && b <= 'F') ? (b - 'A' + 10) : (b - 'a' + 10)
+            );
+        bin[i/2] = (a<<4) + b;
+    }
+}
+
+static void bin_to_hex(char *bin, size_t size, char *hex, int upper) {
+    size_t i;
+    char a;
+    for(i=0; i < size; i++) {
+        a = (bin[i] >> 4) & 0x0F;
+        hex[i*2] = (a >= 0 && a <= 9) ? (a + '0') :
+            (upper ? (a - 10 + 'A') : (a - 10 + 'a'));
+
+        a = (bin[i]) & 0x0F;
+        hex[i*2+1] = (a >= 0 && a <= 9) ? (a + '0') :
+            (upper ? (a - 10 + 'A') : (a - 10 + 'a'));
+    }
+}
+
+/* des
+ * mode: ecb, pkcs5
  */
-static void des_ecb_pkcs5(char *in, size_t size_in, char key[8], char **out, size_t *size_out, char mode) {
+static void des(char *in, size_t size_in, char key[8], char **out, size_t *size_out, char mode) {
     size_t r;
     size_t len;
     size_t i;
@@ -361,12 +393,12 @@ static void des_ecb_pkcs5(char *in, size_t size_in, char key[8], char **out, siz
         data_out = malloc(len);
         for(i = 0; i < len; i+=8) {
             if(i < len-8) {
-                _des(in + i, key, data_out + i, mode);
+                _des_byte8(in + i, key, data_out + i, mode);
             }
             else {
                 memcpy(data, in + i, r);
                 memset(data + r, 8-r, 8-r);
-                _des(data, key, data_out + i, mode);
+                _des_byte8(data, key, data_out + i, mode);
             }
         }
         *out = data_out;
@@ -376,10 +408,42 @@ static void des_ecb_pkcs5(char *in, size_t size_in, char key[8], char **out, siz
         len = size_in;
         data_out = malloc(len);
         for(i = 0; i < len; i+=8) {
-            _des(in + i, key, data_out + i, mode); 
+            _des_byte8(in + i, key, data_out + i, mode); 
         }
         *out = data_out;
         *size_out = len - data_out[len-1];
     }
 }
 
+static char * des_encode_hex(char *in_bin, size_t size_in, char key[8]) {
+    char *out_hex = 0;
+    char *out_bin = 0;
+    size_t size_out = 0;
+
+    des(in_bin, size_in, key, &out_bin, &size_out, 'e');
+    out_hex = malloc(size_out*2+1);
+    memset(out_hex, 0x00, size_out*2+1);
+    bin_to_hex(out_bin, size_out, out_hex, 0);
+    free(out_bin);
+    return out_hex;
+}
+
+static char * des_decode_hex(char *in_hex, char key[8], size_t *size_out) {
+    size_t in_hex_len = 0;
+    size_t size_in = 0;
+    size_t _size_out = 0;
+    char *in_bin = 0;
+    char *out_bin = 0;
+    char *out_bin2 = 0;
+
+    in_hex_len = strlen(in_hex);
+    size_in = in_hex_len/2 + in_hex_len%2;
+    in_bin = malloc(size_in);
+    hex_to_bin(in_hex, in_hex_len, in_bin);
+    des(in_bin, size_in, key, &out_bin, &_size_out, 'd');
+    free(in_bin);
+    out_bin2 = realloc(out_bin, _size_out+1);
+    out_bin2[_size_out+1] = 0;
+    if(size_out) *size_out = _size_out;
+    return out_bin2;
+}

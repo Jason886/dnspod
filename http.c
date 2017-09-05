@@ -33,7 +33,7 @@
 #define MIN(x,y) (((x)<(y))?(x):(y))
 
 #ifdef WIN32
-int inet_pton(int af, const char *src, void *dst) {
+static int inet_pton(int af, const char *src, void *dst) {
   struct sockaddr_storage ss;
   int size = sizeof(ss);
   char src_copy[INET6_ADDRSTRLEN+1];
@@ -56,7 +56,7 @@ int inet_pton(int af, const char *src, void *dst) {
   return 0;
 }
 
-const char *inet_ntop(int af, const void *src, char *dst, socklen_t size) {
+static const char *inet_ntop(int af, const void *src, char *dst, socklen_t size) {
   struct sockaddr_storage ss;
   unsigned long s = size;
 
@@ -95,11 +95,11 @@ static int wait_event(int sockfd, struct timeval *timeout, int read, int write)
     return (ret <= 0 || !FD_ISSET(sockfd, &set)) ? -1 : 0;
 }
 
-int wait_readable(int sockfd, struct timeval timeout) {
+static int wait_readable(int sockfd, struct timeval timeout) {
     return wait_event(sockfd, &timeout, 1, 0);
 }
 
-int wait_writable(int sockfd, struct timeval timeout) {
+static int wait_writable(int sockfd, struct timeval timeout) {
     return wait_event(sockfd, &timeout, 0, 1);
 }
 
@@ -147,14 +147,16 @@ static int receive_all(int sockfd, char *buf, size_t length) {
     return bytes_received;
 }
 
-int make_connection(char *serv_ip, int port)
+static int make_connection(char *serv_ip, int port)
 {
     int sockfd, ret;
     struct sockaddr_in serv_addr;
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
-    //serv_addr.sin_addr.s_addr = inet_addr(serv_ip);
+/*
+    serv_addr.sin_addr.s_addr = inet_addr(serv_ip);
+*/
     inet_pton(AF_INET, serv_ip, &(serv_addr.sin_addr.s_addr));
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -173,7 +175,7 @@ int make_connection(char *serv_ip, int port)
     return sockfd;
 }
 
-int make_request(int sockfd, char *hostname, char *request_path)
+static int make_request(int sockfd, char *hostname, char *request_path)
 {
     char buf[CHUNK_SIZE] = { 0 };
     snprintf(buf, sizeof(buf),
@@ -181,7 +183,7 @@ int make_request(int sockfd, char *hostname, char *request_path)
         request_path, hostname);
     buf[CHUNK_SIZE - 1] = 0;
 
-    //printf("%s\n", buf);
+    printf("%s\n", buf);
     return send_all(sockfd, buf, strlen(buf));
 }
 
@@ -208,7 +210,7 @@ static int buffer_write(struct buffer *b, const char *buf, size_t len)
     return 1;
 }
 
-int fetch_response(int sockfd, char *http_data, size_t http_data_len)
+static int fetch_response(int sockfd, char *http_data, size_t http_data_len)
 {
     char buf[CHUNK_SIZE];
     char *crlf;
@@ -224,7 +226,7 @@ int fetch_response(int sockfd, char *http_data, size_t http_data_len)
         return -1;
     }
     buf[bytes_received] = '\0';
-    //printf("%s\n", buf);
+    printf("%s\n", buf);
 
     crlf = strstr(buf, "\r\n");
     if(crlf == NULL) {
@@ -234,7 +236,7 @@ int fetch_response(int sockfd, char *http_data, size_t http_data_len)
     crlf_pos = crlf - buf;
     buf[crlf_pos] = '\0';
 
-    //parse HTTP response
+    /* parse HTTP response */
     if(sscanf(buf, "HTTP/%*d.%*d %d %*[^\r\n]", &http_response_code) != 1 ) {
         fprintf(stderr, "not a correct HTTP answer : {%s}\n", buf);
         return -1;
@@ -247,7 +249,7 @@ int fetch_response(int sockfd, char *http_data, size_t http_data_len)
     memmove(buf, &buf[crlf_pos + 2], bytes_received-(crlf_pos+2)+1);
     bytes_received -= (crlf_pos + 2);
 
-    //get headers
+    /* get headers */
     while(1) {
         crlf = strstr(buf, "\r\n");
         if(crlf == NULL) {
@@ -282,7 +284,9 @@ int fetch_response(int sockfd, char *http_data, size_t http_data_len)
         ret = sscanf(buf, "%31[^:]: %119[^\r\n]", key, value);
 #endif
         if (ret == 2) {
-            //printf("Read header : %s: %s\n", key, value);
+        /*
+            printf("Read header : %s: %s\n", key, value);
+        */
             if(!strcasecmp(key, "Content-Length")) {
                 sscanf(value, "%d", &content_length);
             }
@@ -300,10 +304,12 @@ int fetch_response(int sockfd, char *http_data, size_t http_data_len)
         return -1;
     }
 
-    //receive data
+    /* receive data */
     buffer_init(&http_data_buf, http_data, http_data_len);
     do {
-        //printf("buffer write %d,%d:%s\n", bytes_received, content_length, buf);
+    /*
+        printf("buffer write %d,%d:%s\n", bytes_received, content_length, buf);
+    */
         buffer_write(&http_data_buf, buf, MIN(bytes_received, content_length));
         if(bytes_received > content_length) {
             memmove(buf, &buf[content_length], bytes_received - content_length);
