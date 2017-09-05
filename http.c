@@ -42,6 +42,7 @@ static int inet_pton(int af, const char *src, void *dst) {
   /* stupid non-const API */
   strncpy (src_copy, src, INET6_ADDRSTRLEN+1);
   src_copy[INET6_ADDRSTRLEN] = 0;
+  printf("src_copy = %s\n", src_copy);
 
   if (WSAStringToAddress(src_copy, af, NULL, (struct sockaddr *)&ss, &size) == 0) {
       printf("af = %d\n");
