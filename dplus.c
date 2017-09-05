@@ -233,9 +233,12 @@ void test_http_query() {
     hi = http_query("www.baidu.com", &ttl);
     printf("hi = %p\n", (void *)hi);
 
-    for (i = 0; i < hi->addr_list_len; i++) {
-        printf("hi->h_addr_list[%d] = %p\n", i, hi->h_addr_list[i]);
-        printf("hi->h_addr_list[%d] = %s\n", i, hi->h_addr_list[i]);
+    if(hi) {
+        for (i = 0; i < hi->addr_list_len; i++) {
+            printf("hi->h_addr_list[%d] = %p\n", i, hi->h_addr_list[i]);
+            printf("hi->h_addr_list[%d] = %s\n", i, hi->h_addr_list[i]);
+        }
+        free(hi);
     }
     printf("\n");
 }
