@@ -57,6 +57,8 @@ static int inet_pton(int af, const char *src, void *dst) {
           return 1;
       }
   }
+  int err = WSAGetLastError();
+  printf("err = %d\n", err);
   printf("return 0\n");
   return 0;
 }
