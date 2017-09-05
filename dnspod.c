@@ -12,30 +12,28 @@
 #include <stdint.h>
 
 #ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
 #else
-#include <sys/time.h>
-#include <sys/socket.h> 
-#include <netdb.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+    #include <sys/time.h>
+    #include <sys/socket.h> 
+    #include <netdb.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
 #endif
 
-
-/*
-#ifndef _WIN32
-struct addrinfo;
-extern int getaddrinfo(const char *hostname, const char *service, const struct addrinfo *hints, struct addrinfo **result);
-#endif
-*/
 
 #define IP_BUFFER_SIZE 128
-static char *_dnspod_server = "119.29.29.29";
+
+static char *_dnspod_server = "119.29.29.29";   /* dnspod服务地址 */
 static int _dnspod_port = 80;
 
-static int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * key, char *ip_out, int *ttl);
-static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], char ** out, size_t *size_out, char mode);
+static int dns_pod(char * dn, char * local_ip, int encrypt, \
+        int key_id, char * key, char *ip_out, int *ttl);
+
+static void des_ecb_pkcs5(char * in, size_t size_in, char key[8], \
+        char ** out, size_t *size_out, char mode);
+
 
 int aiengine_getaddrinfo(const char *hostname, const char *service, \
         const struct addrinfo *hints, struct addrinfo **result) {
@@ -46,7 +44,8 @@ int aiengine_getaddrinfo(const char *hostname, const char *service, \
 
     isIP = 1;
     for(i=0; i<strlen(hostname); i++) {
-        if(hostname[i] == ':') { /* 认为传入的是IPv6地址 */
+        /* 含有,':',则认为传入的是IPv6地址 */
+        if(hostname[i] == ':') {
             isIP = 1;
             break;
         }
@@ -67,25 +66,15 @@ int aiengine_getaddrinfo(const char *hostname, const char *service, \
     return getaddrinfo(ip, service, hints, result);
 }
 
+
 static int _connect() {
     struct in_addr inaddr;
     struct sockaddr_in addr;
     int sockfd;
-
 #ifdef _WIN32
     int timeout = 15000;
-    WSADATA wsadata;
 #else
     struct timeval timeout = {15, 0};
-#endif
-
-#ifdef _WIN32
-    /* Winsows下启用socket */
-    /*
-    if(WSAStartup(MAKEWORD(1,1),&wsadata)==SOCKET_ERROR) {
-        return -1;
-    }
-    */
 #endif
 
     inaddr.s_addr = inet_addr(_dnspod_server);
@@ -110,7 +99,6 @@ static int _connect() {
     if(connect(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
         return -1;
     }
-
     return sockfd;
 }
 
@@ -377,6 +365,7 @@ static int dns_pod(char * dn, char * local_ip, int encrypt, int key_id, char * k
     if(ttl) *ttl = ttl_rsp;
     if(count <= 0) goto ERR;
     ret = 0;
+
 ERR:
 #ifdef _WIN32
     closesocket(sock);
@@ -420,6 +409,13 @@ int test_dns_pod() {
     char *key = "weijianliao";
     int key_id = 1;
     int ret = 0;
+
+#ifdef _WIN32
+    WSADATA wsadata;
+    if(WSAStartup(MAKEWORD(1,1),&wsadata)==SOCKET_ERROR) {
+        return -1;
+    }
+#endif
 
     memset(ip, 0x00, sizeof(ip));
     ret = dns_pod("www.google.com", 0, 0, key_id, key, ip, 0);
