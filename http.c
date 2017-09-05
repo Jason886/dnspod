@@ -15,6 +15,7 @@
     #include <arpa/inet.h>
     #include <unistd.h>
     #include <sys/select.h>
+    #include <strings.h>
 #endif
 
 #define CHUNK_SIZE 1024
@@ -24,6 +25,30 @@
 #define HTTP_DEFAULT_TIMEOUT 5
 
 #define MIN(x,y) (((x)<(y))?(x):(y))
+
+static int wait_event(int sockfd, struct timeval *timeout, int read, int write)
+{
+    int ret;
+    fd_set *readset, *writeset;
+    fd_set set;
+
+    FD_ZERO(&set);
+    FD_SET(sockfd, &set);
+
+    readset = read ? &set : NULL;
+    writeset = write ? &set : NULL;
+
+    ret = select(FD_SETSIZE, readset, writeset, NULL, timeout);
+    return (ret <= 0 || !FD_ISSET(sockfd, &set)) ? -1 : 0;
+}
+
+int wait_readable(int sockfd, struct timeval timeout) {
+    return wait_event(sockfd, &timeout, 1, 0);
+}
+
+int wait_writable(int sockfd, struct timeval timeout) {
+    return wait_event(sockfd, &timeout, 0, 1);
+}
 
 static int send_all(int sockfd, char *buf, size_t length)
 {
