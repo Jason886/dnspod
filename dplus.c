@@ -11,6 +11,20 @@
 #include <unistd.h>
 #include <stdint.h>
 
+#ifdef WIN32
+#include <winsock2.h>
+#include <windows.h>
+#include <ws2tcpip.h>
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <sys/select.h>
+#endif
+
+
 #ifndef NULL
 #define NULL 0
 #endif
@@ -28,6 +42,20 @@
 static uint32_t des_id = INVALID_DES_ID;
 static char des_key[DES_KEY_SIZE] = { 0 };
 static uint32_t des_used = 0;
+
+struct host_info {
+    /* host address type: AF_INET or AF_INET6 */
+    int h_addrtype;
+    /* length of address in bytes:
+          sizeof(struct in_addr) or sizeof(struct in6_addr)
+    */
+    int h_length;
+    /* length of addr list */
+    int addr_list_len;
+    /* list of addresses */
+    char **h_addr_list;
+};
+
 /*
 int aiengine_getaddrinfo(const char *hostname, const char *service, \
         const struct addrinfo *hints, struct addrinfo **result) {
@@ -59,30 +87,40 @@ int aiengine_getaddrinfo(const char *hostname, const char *service, \
     return getaddrinfo(ip, service, hints, result);
 }
 */
+
 static int strchr_num(const char *str, char c) {
-        int count = 0;
-            while (*str){
-                        if (*str++ == c){
-                                        count++;
-                                                }
-                            }
-                return count;
+    int count = 0;
+    while (*str){
+        if (*str++ == c){
+            count++;
+        }
+    }
+    return count;
 }
 
-struct host_info {
-    /* host address type: AF_INET or AF_INET6 */
-    int h_addrtype;
+static int is_address(const char *s) {
+    unsigned char buf[sizeof(struct in6_addr)];
+    int r;
+    
+    r = inet_pton(AF_INET, s, buf);
+    if (r <= 0) {
+        r = inet_pton(AF_INET6, s, buf);
+        return (r > 0);
+    }
+    
+    return 1;
+}
 
-    /*length of address in bytes:
-        sizeof(struct in_addr) or sizeof(struct in6_addr)
-    */
-    int h_length;
-
-    /* length of addr list */
-    int addr_list_len;
-    /* list of addresses */
-    char **h_addr_list;
-};
+static int is_integer(const char *s) {
+    if (*s == '-' || *s == '+')
+        s++;
+    if (*s < '0' || '9' < *s)
+        return 0;
+    s++;
+    while ('0' <= *s && *s <= '9')
+        s++;
+    return (*s == '\0');
+}
 
 static void host_info_clear(struct host_info *host) {
     int i;
@@ -124,8 +162,6 @@ static struct host_info *http_query(const char *node, time_t *ttl) {
         snprintf(http_data, HTTP_DEFAULT_DATA_SIZE, "/d?dn=%s&ttl=1", node);
     http_data[HTTP_DEFAULT_DATA_SIZE] = 0;
 
-    printf("http_data = %s\n", http_data);
-
     ret = make_request(sockfd, HTTPDNS_DEFAULT_SERVER, http_data);
     if (ret < 0){
 #ifdef WIN32
@@ -143,6 +179,7 @@ static struct host_info *http_query(const char *node, time_t *ttl) {
 #else
     close(sockfd);
 #endif
+
     if (ret < 0) {
 #ifdef WIN32
         WSACleanup();
@@ -241,11 +278,240 @@ error:
     return NULL;
 }
 
+static struct addrinfo *malloc_addrinfo(int port, uint32_t addr,
+            int socktype, int proto) 
+{
+    struct addrinfo *ai;
+    struct sockaddr_in *sa_in;
+    size_t socklen;
+    socklen = sizeof(struct sockaddr);
+    
+    ai = (struct addrinfo *)calloc(1, sizeof(struct addrinfo));
+    if (!ai)
+        return NULL;
+    
+    ai->ai_socktype = socktype;
+    ai->ai_protocol = proto;
+    
+    ai->ai_addr = (struct sockaddr *)calloc(1, sizeof(struct sockaddr));
+    if (!ai->ai_addr) {
+        free(ai);
+        return NULL;
+    };
+    
+    ai->ai_addrlen = socklen;
+    ai->ai_addr->sa_family = ai->ai_family = AF_INET;
+    
+    sa_in = (struct sockaddr_in *)ai->ai_addr;
+    sa_in->sin_port = port;
+    sa_in->sin_addr.s_addr = addr;
+    
+    return ai;
+}
+
+void dp_freeaddrinfo(struct addrinfo *ai) {
+    struct addrinfo *next;
+    
+    while (ai != NULL) {
+        if (ai->ai_canonname != NULL)
+            free(ai->ai_canonname);
+        if (ai->ai_addr)
+            free(ai->ai_addr);
+        next = ai->ai_next;
+        free(ai);
+        ai = next;
+    }
+}
+
+static int fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
+            int port, int socktype, int proto)
+{
+    int i;
+    struct addrinfo *cur, *prev = NULL;
+    for (i = 0; i < hi->addr_list_len; i++) {
+        struct in_addr *in = ((struct in_addr *)hi->h_addr_list[i]);
+        cur = malloc_addrinfo(port, in->s_addr, socktype, proto);
+        if (cur == NULL) {
+            if (*res)
+                dp_freeaddrinfo(*res);
+            return EAI_MEMORY;
+        }
+        if (prev)
+            prev->ai_next = cur;
+        else
+            *res = cur;
+        prev = cur;
+    }
+    
+    return 0;
+}
+
+static struct addrinfo *dup_addrinfo(struct addrinfo *ai) {
+    struct addrinfo *cur, *head = NULL, *prev = NULL;
+    while (ai != NULL) {
+        cur = (struct addrinfo *)malloc(sizeof(struct addrinfo));
+        if (!cur)
+            goto error;
+        
+        memcpy(cur, ai, sizeof(struct addrinfo));
+        
+        cur->ai_addr = (struct sockaddr *)malloc(sizeof(struct sockaddr));
+        if (!cur->ai_addr) {
+            free(cur);
+            goto error;
+        };
+        memcpy(cur->ai_addr, ai->ai_addr, sizeof(struct sockaddr));
+        
+        if (ai->ai_canonname)
+            cur->ai_canonname = strdup(ai->ai_canonname);
+        
+        if (prev)
+            prev->ai_next = cur;
+        else
+            head = cur;
+        prev = cur;
+
+        ai = ai->ai_next;
+    }
+
+    return head;
+
+error:
+    if (head) {
+        dp_freeaddrinfo(head);
+    }
+    return NULL;
+}
+
+
+int dp_getaddrinfo(const char *node, const char *service,
+    const struct addrinfo *hints, struct addrinfo **res)
+{
+    struct host_info *hi = NULL;
+    int port = 0, socktype, proto, ret = 0;
+
+    time_t ttl;
+
+    if (node == NULL)
+        return EAI_NONAME;
+
+    /* AI_NUMERICHOST not supported */
+    if (is_address(node) || (hints && (hints->ai_flags & AI_NUMERICHOST)))
+        return EAI_BADFLAGS;
+
+    if (hints && hints->ai_family != PF_INET
+        && hints->ai_family != PF_UNSPEC
+        && hints->ai_family != PF_INET6) {
+        return EAI_FAMILY;
+    }
+    if (hints && hints->ai_socktype != SOCK_DGRAM
+        && hints->ai_socktype != SOCK_STREAM
+        && hints->ai_socktype != 0) {
+        return EAI_SOCKTYPE;
+    }
+
+    socktype = (hints && hints->ai_socktype) ? hints->ai_socktype
+        : SOCK_STREAM;
+    if (hints && hints->ai_protocol)
+        proto = hints->ai_protocol;
+    else {
+        switch (socktype) {
+        case SOCK_DGRAM:
+            proto = IPPROTO_UDP;
+            break;
+        case SOCK_STREAM:
+            proto = IPPROTO_TCP;
+            break;
+        default:
+            proto = 0;
+            break;
+        }
+    }
+
+    if (service != NULL && service[0] == '*' && service[1] == 0)
+        service = NULL;
+
+    if (service != NULL) {
+        if (is_integer(service))
+            port = htons(atoi(service));
+        else {
+            struct servent *servent;
+            char *pe_proto;
+#ifdef WIN32
+            WSADATA wsa;
+            WSAStartup(MAKEWORD(2, 2), &wsa);
+#endif
+            switch (socktype){
+            case SOCK_DGRAM:
+                pe_proto = "udp";
+                break;
+            case SOCK_STREAM:
+                pe_proto = "tcp";
+                break;
+            default:
+                pe_proto = "tcp";
+                break;
+            }
+            servent = getservbyname(service, pe_proto);
+            if (servent == NULL) {
+#ifdef WIN32
+                WSACleanup();
+#endif
+                return EAI_SERVICE;
+            }
+            port = servent->s_port;
+#ifdef WIN32
+            WSACleanup();
+#endif
+        }
+    }
+    else {
+        port = htons(0);
+    }
+
+    /*
+    * 首先使用HttpDNS向D+服务器进行请求,
+    * 如果失败则调用系统接口进行解析，该结果不会缓存
+    */
+    hi = http_query(node, &ttl);
+    if (NULL == hi) {
+        struct addrinfo *answer;
+        ret = getaddrinfo(node, service, hints, &answer);
+        if (ret == 0) {
+            *res = dup_addrinfo(answer);
+            freeaddrinfo(answer);
+            if (*res == NULL) {
+                return EAI_MEMORY;
+            }
+        }
+        return ret;
+    }
+    printf("here\n");
+    ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
+    printf("ret = %d\n", ret);
+    return ret;
+}
+
 #ifdef __TEST
 void test_http_query() {
     time_t ttl;
     struct host_info *hi;
+    struct addrinfo        hint;
+    struct addrinfo        *ailist;
     int i;
+
+    hint.ai_flags = AI_CANONNAME;
+        hint.ai_family = 0;
+            hint.ai_socktype = 0;
+                hint.ai_protocol = 0;
+                    hint.ai_addrlen = 0;
+                        hint.ai_canonname = NULL;
+                            hint.ai_addr = NULL;
+                                hint.ai_next = NULL;
+
+    dp_getaddrinfo("www.baidu.com", NULL, &hint, &ailist);
+
+    /*
     hi = http_query("www.baidu.com", &ttl);
     printf("hi = %p\n", (void *)hi);
 
@@ -255,7 +521,7 @@ void test_http_query() {
             printf("hi->h_addr_list[%d] = %s\n", i, hi->h_addr_list[i]);
         }
         free(hi);
-    }
+    }*/
     printf("\n");
 }
 
