@@ -146,7 +146,7 @@ static struct host_info *http_query(const char *node, time_t *ttl) {
     if (ret < 0) {
 #ifdef WIN32
         WSACleanup();
-#else
+#endif
         return NULL;
     }
 
@@ -155,7 +155,7 @@ static struct host_info *http_query(const char *node, time_t *ttl) {
         if (NULL == http_data_ptr) {
 #ifdef WIN32
             WSACleanup();
-#else
+#endif
             return NULL;
         }
         http_data_ptr_head = http_data_ptr;
@@ -181,7 +181,7 @@ static struct host_info *http_query(const char *node, time_t *ttl) {
         }
 #ifdef WIN32
         WSACleanup();
-#else
+#endif
         return NULL;
     }
 
@@ -228,13 +228,13 @@ static struct host_info *http_query(const char *node, time_t *ttl) {
 
 #ifdef WIN32
     WSACleanup();
-#else
+#endif
     return hi;
 
 error:
 #ifdef WIN32
     WSACleanup();
-#else
+#endif
     if (des_used)
         free(http_data_ptr_head);
 
