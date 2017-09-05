@@ -140,17 +140,24 @@ static struct host_info *http_query(const char *node, time_t *ttl) {
     ret = fetch_response(sockfd, http_data, HTTP_DEFAULT_DATA_SIZE);
 #ifdef WIN32
     closesocket(sockfd);
-    WSACleanup();
 #else
     close(sockfd);
 #endif
-    if (ret < 0)
+    if (ret < 0) {
+#ifdef WIN32
+        WSACleanup();
+#else
         return NULL;
+    }
 
     if (des_used) {
         http_data_ptr = des_decode_hex(http_data, des_key, NULL); 
-        if (NULL == http_data_ptr)
+        if (NULL == http_data_ptr) {
+#ifdef WIN32
+            WSACleanup();
+#else
             return NULL;
+        }
         http_data_ptr_head = http_data_ptr;
     }
     else {
@@ -172,6 +179,9 @@ static struct host_info *http_query(const char *node, time_t *ttl) {
         if(des_used) {
             free(http_data_ptr_head);
         }
+#ifdef WIN32
+        WSACleanup();
+#else
         return NULL;
     }
 
@@ -216,9 +226,15 @@ static struct host_info *http_query(const char *node, time_t *ttl) {
     if (des_used)
         free(http_data_ptr_head);
 
+#ifdef WIN32
+    WSACleanup();
+#else
     return hi;
 
 error:
+#ifdef WIN32
+    WSACleanup();
+#else
     if (des_used)
         free(http_data_ptr_head);
 
