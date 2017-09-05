@@ -8,9 +8,11 @@
     #include <winsock2.h>
     #include <windows.h>
     #include <ws2tcpip.h>
-
+    #define snprintf(buf, size, format, ...) \
+        _snprintf_s(buf, size, size - 1, format, __VA_ARGS__)
+    #define strncpy(dest, src, n) strncpy_s(dest, sizeof(dest), src, n)
     #define strcasecmp _stricmp
-    //#define strdup _strdup
+    #define strdup _strdup
     #define sscanf sscanf_s
 #else
     #include <sys/socket.h>
