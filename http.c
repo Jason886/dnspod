@@ -44,6 +44,8 @@ static int inet_pton(int af, const char *src, void *dst) {
   src_copy[INET6_ADDRSTRLEN] = 0;
   printf("src_copy = %s\n", src_copy);
 
+  int ret = WSAStringToAddress(src_copy, af, NULL, (struct sockaddr *)&ss, &size);
+  printf("ret = %d\n", ret);
   if (WSAStringToAddress(src_copy, af, NULL, (struct sockaddr *)&ss, &size) == 0) {
       printf("af = %d\n");
       switch(af) {
@@ -63,7 +65,7 @@ static const char *inet_ntop(int af, const void *src, char *dst, socklen_t size)
   struct sockaddr_storage ss;
   unsigned long s = size;
 
-  ZeroMemory(&ss, sizeof(ss));
+  memset(&ss, 0x00, sizeof(ss));
   ss.ss_family = af;
 
   switch(af) {
