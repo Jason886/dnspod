@@ -385,7 +385,6 @@ dp_getaddrinfo(const char *node, const char *service,
     ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
     printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
     host_info_clear(hi);
-    print_addrinfo(*res); 
     if(ret == 0) goto RET;
 
 SYS_DNS:
@@ -406,6 +405,10 @@ void test(int argc, char *argv[]) {
     struct addrinfo *ailist;
     int ret;
     char *node;
+    #ifdef WIN32
+        WSADATA wsa;
+        WSAStartup(MAKEWORD(2, 2), &wsa);
+    #endif
 
     if(argc < 2) {
         node = "www.baidu.com";
@@ -421,8 +424,8 @@ void test(int argc, char *argv[]) {
     hints.ai_flags = 0;
 
     ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
-
     printf("ret = %d\n", ret);
+    print_addrinfo(ailist); 
     if(ailist) freeaddrinfo(ailist);
 }
 
