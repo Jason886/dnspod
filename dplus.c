@@ -300,25 +300,32 @@ dp_getaddrinfo(const char *node, const char *service,
     struct host_info *hi = NULL;
     int port = 0, socktype, proto, ret = 0;
     time_t ttl;
-
-    *res = NULL;
-    printf("!!!! node = %s\n", node);
+    #ifdef WIN32
+        WSADATA wsa;
+    #endif
 
     if (node == NULL)
         return EAI_NONAME;
 
+    #ifdef WIN32
+        WSAStartup(MAKEWORD(2, 2), &wsa);
+    #endif
+
+    *res = NULL;
+    printf("!!!! node = %s\n", node);
+    
     if (is_address(node) || (hints && (hints->ai_flags & AI_NUMERICHOST)))
-        goto sys_dns;
+        goto SYS_DNS;
 
     if (hints && hints->ai_family != PF_INET
         && hints->ai_family != PF_UNSPEC
         && hints->ai_family != PF_INET6) {
-        goto sys_dns;
+        goto SYS_DNS;
     }
     if (hints && hints->ai_socktype != SOCK_DGRAM
         && hints->ai_socktype != SOCK_STREAM
         && hints->ai_socktype != 0) {
-        goto sys_dns;
+        goto SYS_DNS;
     }
 
     /*
@@ -327,7 +334,7 @@ dp_getaddrinfo(const char *node, const char *service,
     */
     hi = http_query(node, &ttl);
     if (NULL == hi) {
-        goto sys_dns;
+        goto SYS_DNS;
     }
 
     socktype = (hints && hints->ai_socktype) ? hints->ai_socktype : SOCK_STREAM;
@@ -350,16 +357,13 @@ dp_getaddrinfo(const char *node, const char *service,
     if (service != NULL && service[0] == '*' && service[1] == 0)
         service = NULL;
     
+
     if (service != NULL) {
         if (is_integer(service))
             port = htons(atoi(service));
         else {
             struct servent *servent;
             char *pe_proto;
-#ifdef WIN32
-            WSADATA wsa;
-            WSAStartup(MAKEWORD(2, 2), &wsa);
-#endif
             switch (socktype){
             case SOCK_DGRAM:
                 pe_proto = "udp";
@@ -373,15 +377,9 @@ dp_getaddrinfo(const char *node, const char *service,
             }
             servent = getservbyname(service, pe_proto);
             if (servent == NULL) {
-#ifdef WIN32
-                WSACleanup();
-#endif
-                return EAI_SERVICE;
+                goto SYS_DNS;
             }
             port = servent->s_port;
-#ifdef WIN32
-            WSACleanup();
-#endif
         }
     }
     else {
@@ -389,12 +387,17 @@ dp_getaddrinfo(const char *node, const char *service,
     }
 
     ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
-    printf("http_dns: ret = %d, node = %s\n", ret, node);
-    return ret;
+    printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
+    if(ret == 0) goto RET;
 
-sys_dns:
+SYS_DNS:
     ret = getaddrinfo(node, service, hints, res);
-    printf("sys_dns: ret = %d, node = %s\n", ret, node);
+    printf("SYS_DNS: ret = %d, node = %s\n", ret, node);
+
+RET:
+    #ifdef WIN32
+        WSACleanup();
+    #endif
     return ret;
 }
 
