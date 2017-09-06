@@ -309,6 +309,7 @@ static struct addrinfo *malloc_addrinfo(int port, uint32_t addr,
     return ai;
 }
 
+/*
 void dp_freeaddrinfo(struct addrinfo *ai) {
     struct addrinfo *next;
     
@@ -322,6 +323,7 @@ void dp_freeaddrinfo(struct addrinfo *ai) {
         ai = next;
     }
 }
+*/
 
 static int fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
             int port, int socktype, int proto)
@@ -333,7 +335,7 @@ static int fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
         cur = malloc_addrinfo(port, in->s_addr, socktype, proto);
         if (cur == NULL) {
             if (*res)
-                dp_freeaddrinfo(*res);
+                freeaddrinfo(*res);
             return EAI_MEMORY;
         }
         if (prev)
@@ -346,6 +348,7 @@ static int fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
     return 0;
 }
 
+/*
 static struct addrinfo *dup_addrinfo(struct addrinfo *ai) {
     struct addrinfo *cur, *head = NULL, *prev = NULL;
     while (ai != NULL) {
@@ -382,6 +385,7 @@ error:
     }
     return NULL;
 }
+*/
 
 
 int dp_getaddrinfo(const char *node, const char *service,
@@ -389,29 +393,35 @@ int dp_getaddrinfo(const char *node, const char *service,
 {
     struct host_info *hi = NULL;
     int port = 0, socktype, proto, ret = 0;
-
     time_t ttl;
 
     if (node == NULL)
         return EAI_NONAME;
 
-    /* AI_NUMERICHOST not supported */
     if (is_address(node) || (hints && (hints->ai_flags & AI_NUMERICHOST)))
-        return EAI_BADFLAGS;
+        goto sys_dns;
 
     if (hints && hints->ai_family != PF_INET
         && hints->ai_family != PF_UNSPEC
         && hints->ai_family != PF_INET6) {
-        return EAI_FAMILY;
+        goto sys_dns;
     }
     if (hints && hints->ai_socktype != SOCK_DGRAM
         && hints->ai_socktype != SOCK_STREAM
         && hints->ai_socktype != 0) {
-        return EAI_SOCKTYPE;
+        goto sys_dns;
     }
 
-    socktype = (hints && hints->ai_socktype) ? hints->ai_socktype
-        : SOCK_STREAM;
+    /*
+    * 首先使用HttpDNS向D+服务器进行请求,
+    * 如果失败则调用系统接口进行解析，该结果不会缓存
+    */
+    hi = http_query(node, &ttl);
+    if (NULL == hi) {
+        goto sys_dns;
+    }
+
+    socktype = (hints && hints->ai_socktype) ? hints->ai_socktype : SOCK_STREAM;
     if (hints && hints->ai_protocol)
         proto = hints->ai_protocol;
     else {
@@ -430,7 +440,7 @@ int dp_getaddrinfo(const char *node, const char *service,
 
     if (service != NULL && service[0] == '*' && service[1] == 0)
         service = NULL;
-
+    
     if (service != NULL) {
         if (is_integer(service))
             port = htons(atoi(service));
@@ -469,36 +479,17 @@ int dp_getaddrinfo(const char *node, const char *service,
         port = htons(0);
     }
 
-    /*
-    * 首先使用HttpDNS向D+服务器进行请求,
-    * 如果失败则调用系统接口进行解析，该结果不会缓存
-    */
-    hi = http_query(node, &ttl);
-    if (NULL == hi) {
-        struct addrinfo *answer;
-        ret = getaddrinfo(node, service, hints, &answer);
-        if (ret == 0) {
-            *res = dup_addrinfo(answer);
-            freeaddrinfo(answer);
-            if (*res == NULL) {
-                return EAI_MEMORY;
-            }
-        }
-        return ret;
-    }
-    printf("here\n");
     ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
-    printf("ret = %d\n", ret);
+
+sys_dns:
+    ret = getaddrinfo(node, service, hints, res);
     return ret;
 }
 
 #ifdef __TEST
 void test_http_query() {
-    time_t ttl;
-    struct host_info *hi;
     struct addrinfo        hint;
     struct addrinfo        *ailist;
-    int i;
 
     hint.ai_flags = AI_CANONNAME;
         hint.ai_family = 0;
