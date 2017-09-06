@@ -6,227 +6,74 @@
  * TODO: 测试在长时间未收到d+数据时，是否能够超时返回，超时时间是多少
  */
 
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdint.h>
-
-#ifdef WIN32
-#include <winsock2.h>
-#include <windows.h>
-#include <ws2tcpip.h>
-#else
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <sys/select.h>
-#endif
-
-#ifndef NULL
-#define NULL 0
-#endif
-
-#include "http.c"
-#include "des.c"
-
-#define HTTPDNS_DEFAULT_SERVER "119.29.29.29"
-#define HTTPDNS_DEFAULT_PORT   80
-#define HTTP_DEFAULT_DATA_SIZE 1024
-#define DES_KEY_SIZE 8
-
-static uint32_t des_id = -1;
-static char des_key[DES_KEY_SIZE] = { 0 };
-static uint32_t des_used = 0;
-
-struct host_info {
-    int h_addrtype; /* host address type: AF_INET or AF_INET6 */
-    int h_length; /* length of address in bytes: 
-                     sizeof(struct in_addr) or sizeof(struct in6_addr) */
-    int addr_list_len; /* length of addr list */
-    char **h_addr_list; /* list of addresses */
-};
-
-static int 
-strchr_num(const char *str, char c) {
-    int count = 0;
-    while (*str){
-        if (*str++ == c){
-            count++;
-        }
-    }
-    return count;
+static char * 
+widechar_to_byte(LPCWSTR widestr) {
+    char * str = 0;
+    int len;
+    len = WideCharToMultiByte(CP_UTF8,
+                        0,
+                        widestr,
+                        -1,
+                        NULL,
+                        0,
+                        NULL,
+                        NULL);
+    str = malloc(len+1);
+    memset(str, 0x00, len+1);
+    WideCharToMultiByte(CP_UTF8,
+                        0,
+                        widestr,
+                        -1,
+                        str,
+                        len,
+                        NULL,
+                        NULL);
+    return str;
 }
 
 static int 
-is_address(const char *s) {
+is_address_w(LPCWSTR s) {
     unsigned char buf[sizeof(struct in6_addr)];
     int r;
-    r = inet_pton(AF_INET, s, buf);
+    char *ss;
+    ss = widechar_to_byte(s);
+    r = inet_pton(AF_INET, ss, buf);
     if (r <= 0) {
-        r = inet_pton(AF_INET6, s, buf);
+        r = inet_pton(AF_INET6, ss, buf);
+        free(ss);
         return (r > 0);
     }
+    free(ss);
     return 1;
 }
 
 static int 
-is_integer(const char *s) {
-    if (*s == '-' || *s == '+')
-        s++;
-    if (*s < '0' || '9' < *s)
+is_integer_w(LPCWSTR s) {
+    char *ss, *ss_head;
+    int ret;
+    ss_head = ss = widechar_to_byte(s);
+    s = NULL;
+    if (*ss == '-' || *ss == '+')
+        ss++;
+    if (*ss < '0' || '9' < *ss)
         return 0;
-    s++;
-    while ('0' <= *s && *s <= '9')
-        s++;
-    return (*s == '\0');
+    ss++;
+    while ('0' <= *ss && *ss <= '9')
+        ss++;
+
+    ret = (*ss == '\0');
+    free(ss_head);
+    return ret;
 }
 
-static void 
-host_info_clear(struct host_info *host) {
-    int i;
-    for (i = 0; i < host->addr_list_len; i++) {
-        if (host->h_addr_list[i]) {
-            free(host->h_addr_list[i]);
-        }
-    }
-    free(host->h_addr_list);
-    free(host);
-}
-
-static struct host_info *
-http_query(const char *node, time_t *ttl) {
-    int i, ret, sockfd;
-    struct host_info *hi;
-    char http_data[HTTP_DEFAULT_DATA_SIZE + 1];
-    char *http_data_ptr, *http_data_ptr_head;
-    char *comma_ptr;
-    char * node_en;
-
-    sockfd = make_connection(HTTPDNS_DEFAULT_SERVER, HTTPDNS_DEFAULT_PORT);
-    if (sockfd < 0) {
-        return NULL;
-    }
-
-    if (des_used) {
-        node_en = des_encode_hex((char *)node, strlen(node), des_key); 
-        snprintf(http_data, HTTP_DEFAULT_DATA_SIZE, "/d?dn=%s&ttl=1&id=%d", node_en, des_id);
-        free(node_en);
-    }
-    else
-        snprintf(http_data, HTTP_DEFAULT_DATA_SIZE, "/d?dn=%s&ttl=1", node);
-    http_data[HTTP_DEFAULT_DATA_SIZE] = 0;
-
-    ret = make_request(sockfd, HTTPDNS_DEFAULT_SERVER, http_data);
-    if (ret < 0){
-#ifdef WIN32
-        closesocket(sockfd);
-#else
-        close(sockfd);
-#endif
-        return NULL;
-    }
-
-    ret = fetch_response(sockfd, http_data, HTTP_DEFAULT_DATA_SIZE);
-#ifdef WIN32
-    closesocket(sockfd);
-#else
-    close(sockfd);
-#endif
-
-    if (ret < 0) {
-        return NULL;
-    }
-
-    if (des_used) {
-        http_data_ptr = des_decode_hex(http_data, des_key, NULL); 
-        if (NULL == http_data_ptr) {
-            return NULL;
-        }
-        http_data_ptr_head = http_data_ptr;
-    }
-    else {
-        http_data_ptr = http_data;
-    }
-
-    comma_ptr = strchr(http_data_ptr, ',');
-    if (comma_ptr != NULL) {
-        sscanf(comma_ptr + 1, "%ld", ttl);
-        *comma_ptr = '\0';
-    }
-    else {
-        *ttl = 0;
-    }
-
-    hi = (struct host_info *)malloc(sizeof(struct host_info));
-    if (hi == NULL) {
-        fprintf(stderr, "malloc struct host_info failed\n");
-        if(des_used) {
-            free(http_data_ptr_head);
-        }
-        return NULL;
-    }
-
-    /* Only support IPV4 */
-    hi->h_addrtype = AF_INET;
-    hi->h_length = sizeof(struct in_addr);
-    hi->addr_list_len = strchr_num(http_data_ptr, ';') + 1;
-    hi->h_addr_list = (char **)calloc(hi->addr_list_len, sizeof(char *));
-    if (hi->h_addr_list == NULL) {
-        fprintf(stderr, "calloc addr_list failed\n");
-        free(hi);
-        goto error;
-    }
-
-    memset(hi->h_addr_list, 0x00, hi->addr_list_len * sizeof(char *));
-    for (i = 0; i < hi->addr_list_len; ++i) {
-        char *addr;
-        char *ipstr = http_data_ptr;
-        char *semicolon = strchr(ipstr, ';');
-        if (semicolon != NULL) {
-            *semicolon = '\0';
-            http_data_ptr = semicolon + 1;
-        }
-
-        addr = (char *)malloc(sizeof(struct in_addr));
-        if (addr == NULL) {
-            fprintf(stderr, "malloc struct in_addr failed\n");
-            host_info_clear(hi);
-            goto error;
-        }
-        ret = inet_pton(AF_INET, ipstr, addr);
-        if (ret <= 0) {
-            fprintf(stderr, "invalid ipstr:%s\n", ipstr);
-            free(addr);
-            host_info_clear(hi);
-            goto error;
-        }
-
-        hi->h_addr_list[i] = addr;
-    }
-
-    if (des_used)
-        free(http_data_ptr_head);
-
-    return hi;
-
-error:
-    if (des_used)
-        free(http_data_ptr_head);
-
-    return NULL;
-}
-
-static struct addrinfo *
-malloc_addrinfo(int port, uint32_t addr, int socktype, int proto) {
-    struct addrinfo *ai;
+static struct addrinfoW *
+malloc_addrinfo_w(int port, uint32_t addr, int socktype, int proto) {
+    struct addrinfoW *ai;
     struct sockaddr_in *sa_in;
     size_t socklen;
     socklen = sizeof(struct sockaddr);
     
-    ai = (struct addrinfo *)calloc(1, sizeof(struct addrinfo));
+    ai = (struct addrinfoW *)calloc(1, sizeof(struct addrinfoW));
     if (!ai)
         return NULL;
     
@@ -249,8 +96,8 @@ malloc_addrinfo(int port, uint32_t addr, int socktype, int proto) {
     return ai;
 }
 
-void print_addrinfo(struct addrinfo *ai) {
-    printf("addrinfo: %p\n", (void *)ai);
+void print_addrinfo_w(struct addrinfoW *ai) {
+    printf("addrinfoW: %p\n", (void *)ai);
     if(ai) {
         printf("ai_flags = %d\n", ai->ai_flags);
         printf("ai_family = %d\n", ai->ai_family);
@@ -263,14 +110,13 @@ void print_addrinfo(struct addrinfo *ai) {
     }
     printf("\n");
     if(ai->ai_next) {
-        print_addrinfo(ai->ai_next);
+        print_addrinfo_w(ai->ai_next);
     }
 }
 
-
 void
-dp_freeaddrinfo(struct addrinfo *ai) {
-    struct addrinfo *next;
+dp_freeaddrinfo_w(struct addrinfoW *ai) {
+    struct addrinfoW *next;
     while (ai != NULL) {
         if (ai->ai_canonname != NULL)
             free(ai->ai_canonname);
@@ -283,14 +129,14 @@ dp_freeaddrinfo(struct addrinfo *ai) {
 }
 
 static struct 
-addrinfo *dup_addrinfo(struct addrinfo *ai) {
-    struct addrinfo *cur, *head = NULL, *prev = NULL;
+addrinfoW *dup_addrinfo_w(struct addrinfoW *ai) {
+    struct addrinfoW *cur, *head = NULL, *prev = NULL;
     while (ai != NULL) {
-        cur = (struct addrinfo *)malloc(sizeof(struct addrinfo));
+        cur = (struct addrinfoW *)malloc(sizeof(struct addrinfoW));
         if (!cur)
             goto error;
 
-        memcpy(cur, ai, sizeof(struct addrinfo));
+        memcpy(cur, ai, sizeof(struct addrinfoW));
 
         cur->ai_addr = (struct sockaddr *)malloc(sizeof(struct sockaddr));
         if (!cur->ai_addr) {
@@ -315,23 +161,23 @@ addrinfo *dup_addrinfo(struct addrinfo *ai) {
 
 error:
     if (head) {
-        dp_freeaddrinfo(head);
+        dp_freeaddrinfo_w(head);
     }
     return NULL;
 }
 
 
 static int 
-fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
+fillin_addrinfoW_res(struct addrinfoW **res, struct host_info *hi,
     int port, int socktype, int proto) {
     int i;
-    struct addrinfo *cur, *prev = NULL;
+    struct addrinfoW *cur, *prev = NULL;
     for (i = 0; i < hi->addr_list_len; i++) {
         struct in_addr *in = ((struct in_addr *)hi->h_addr_list[i]);
-        cur = malloc_addrinfo(port, in->s_addr, socktype, proto);
+        cur = malloc_addrinfo_w(port, in->s_addr, socktype, proto);
         if (cur == NULL) {
             if (*res)
-                dp_freeaddrinfo(*res);
+                dp_freeaddrinfo_w(*res);
             return EAI_MEMORY;
         }
         if (prev)
@@ -344,18 +190,24 @@ fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
 }
 
 int
-dp_getaddrinfo(const char *node, const char *service,
-    const struct addrinfo *hints, struct addrinfo **res) {
+dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
+    const struct addrinfoW *hints, struct addrinfoW **res) {
     struct host_info *hi = NULL;
     int port = 0, socktype, proto, ret = 0;
     time_t ttl;
-    struct addrinfo *answer;
+    struct addrinfoW *answer;
+    char * node, *service;
     #ifdef WIN32
         WSADATA wsa;
     #endif
 
+    if (node_w == NULL)
+        return EAI_NONAME;
+    node = widechar_to_byte(node_w);
     if (node == NULL)
         return EAI_NONAME;
+
+    service = widechar_to_byte(service_w);
 
     #ifdef WIN32
         WSAStartup(MAKEWORD(2, 2), &wsa);
@@ -435,18 +287,18 @@ dp_getaddrinfo(const char *node, const char *service,
         goto SYS_DNS;
     }
 
-    ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
+    ret = fillin_addrinfoW_res(res, hi, port, socktype, proto);
     printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
     host_info_clear(hi);
     if(ret == 0) goto RET;
 
 SYS_DNS:
     *res = NULL;
-    ret = getaddrinfo(node, service, hints, &answer);
+    ret = GetAddrInfoW(node_w, service_w, hints, &answer);
     printf("SYS_DNS: ret = %d, node = %s\n", ret, node);
     if (ret == 0) {
-        *res = dup_addrinfo(answer);
-        freeaddrinfo(answer);
+        *res = dup_addrinfo_w(answer);
+        FreeAddrInfoW(answer);
         if (*res == NULL) {
             return EAI_MEMORY;
         }
@@ -458,8 +310,6 @@ RET:
     #endif
     return ret;
 }
-
-#include "dplusw.c"
 
 #ifdef __TEST
 void test(int argc, char *argv[]) {
@@ -488,7 +338,7 @@ void test(int argc, char *argv[]) {
     ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
     printf("ret = %d\n", ret);
     print_addrinfo(ailist); 
-    if(ailist) dp_freeaddrinfo(ailist);
+    if(ailist) dp_freeaddrinfo_w(ailist);
 }
 
 int main(int argc, char *argv[]) {
