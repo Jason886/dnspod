@@ -389,6 +389,7 @@ dp_getaddrinfo(const char *node, const char *service,
     if(ret == 0) goto RET;
 
 SYS_DNS:
+    *res = NULL;
     ret = getaddrinfo(node, service, hints, res);
     printf("SYS_DNS: ret = %d, node = %s\n", ret, node);
 
