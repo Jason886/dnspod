@@ -212,7 +212,6 @@ http_query(const char *node, time_t *ttl) {
             host_info_clear(hi);
             goto error;
         }
-        printf("ipstr = %s\n", ipstr);
         ret = inet_pton(AF_INET, ipstr, addr);
         if (ret <= 0) {
             fprintf(stderr, "invalid ipstr:%s\n", ipstr);
@@ -303,6 +302,7 @@ dp_getaddrinfo(const char *node, const char *service,
     time_t ttl;
 
     *res = NULL;
+    printf("!!!! node = %s\n", node);
 
     if (node == NULL)
         return EAI_NONAME;
@@ -389,10 +389,12 @@ dp_getaddrinfo(const char *node, const char *service,
     }
 
     ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
+    printf("http_dns: ret = %d, node = %s\n", ret, node);
     return ret;
 
 sys_dns:
     ret = getaddrinfo(node, service, hints, res);
+    printf("sys_dns: ret = %d, node = %s\n", ret, node);
     return ret;
 }
 
@@ -420,8 +422,6 @@ void test(int argc, char *argv[]) {
 
     printf("ret = %d\n", ret);
     if(ailist) freeaddrinfo(ailist);
-
-    printf("\n");
 }
 
 int main(int argc, char *argv[]) {

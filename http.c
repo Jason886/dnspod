@@ -182,8 +182,9 @@ static int make_request(int sockfd, char *hostname, char *request_path)
         "GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n",
         request_path, hostname);
     buf[CHUNK_SIZE - 1] = 0;
-
+/*
     printf("%s\n", buf);
+*/
     return send_all(sockfd, buf, strlen(buf));
 }
 
@@ -226,8 +227,9 @@ static int fetch_response(int sockfd, char *http_data, size_t http_data_len)
         return -1;
     }
     buf[bytes_received] = '\0';
+/*
     printf("%s\n", buf);
-
+*/
     crlf = strstr(buf, "\r\n");
     if(crlf == NULL) {
         return -1;
