@@ -267,9 +267,63 @@ void print_addrinfo(struct addrinfo *ai) {
     }
 }
 
+
+void
+dp_freeaddrinfo(struct addrinfo *ai) {
+    struct addrinfo *next;
+    while (ai != NULL) {
+        if (ai->ai_canonname != NULL)
+            free(ai->ai_canonname);
+        if (ai->ai_addr)
+            free(ai->ai_addr);
+        next = ai->ai_next;
+        free(ai);
+        ai = next;
+    }
+}
+
+static struct 
+addrinfo *dup_addrinfo(struct addrinfo *ai) {
+    struct addrinfo *cur, *head = NULL, *prev = NULL;
+    while (ai != NULL) {
+        cur = (struct addrinfo *)malloc(sizeof(struct addrinfo));
+        if (!cur)
+            goto error;
+
+        memcpy(cur, ai, sizeof(struct addrinfo));
+
+        cur->ai_addr = (struct sockaddr *)malloc(sizeof(struct sockaddr));
+        if (!cur->ai_addr) {
+            free(cur);
+            goto error;
+        };
+        memcpy(cur->ai_addr, ai->ai_addr, sizeof(struct sockaddr));
+
+        if (ai->ai_canonname)
+            cur->ai_canonname = strdup(ai->ai_canonname);
+
+        if (prev)
+            prev->ai_next = cur;
+        else
+            head = cur;
+        prev = cur;
+
+        ai = ai->ai_next;
+    }
+
+    return head;
+
+error:
+    if (head) {
+        dp_freeaddrinfo(head);
+    }
+    return NULL;
+}
+
+
 static int 
 fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
-        int port, int socktype, int proto) {
+    int port, int socktype, int proto) {
     int i;
     struct addrinfo *cur, *prev = NULL;
     for (i = 0; i < hi->addr_list_len; i++) {
@@ -277,7 +331,7 @@ fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
         cur = malloc_addrinfo(port, in->s_addr, socktype, proto);
         if (cur == NULL) {
             if (*res)
-                freeaddrinfo(*res);
+                dp_freeaddrinfo(*res);
             return EAI_MEMORY;
         }
         if (prev)
@@ -286,7 +340,6 @@ fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
             *res = cur;
         prev = cur;
     }
-    
     return 0;
 }
 
@@ -296,6 +349,7 @@ dp_getaddrinfo(const char *node, const char *service,
     struct host_info *hi = NULL;
     int port = 0, socktype, proto, ret = 0;
     time_t ttl;
+    struct addrinfo *answer;
     #ifdef WIN32
         WSADATA wsa;
     #endif
@@ -307,8 +361,8 @@ dp_getaddrinfo(const char *node, const char *service,
         WSAStartup(MAKEWORD(2, 2), &wsa);
     #endif
 
-    *res = NULL;
     printf("!!!! node = %s\n", node);
+    *res = NULL;
     
     if (is_address(node) || (hints && (hints->ai_flags & AI_NUMERICHOST)))
         goto SYS_DNS;
@@ -321,15 +375,6 @@ dp_getaddrinfo(const char *node, const char *service,
     if (hints && hints->ai_socktype != SOCK_DGRAM
         && hints->ai_socktype != SOCK_STREAM
         && hints->ai_socktype != 0) {
-        goto SYS_DNS;
-    }
-
-    /*
-    * 首先使用HttpDNS向D+服务器进行请求,
-    * 如果失败则调用系统接口进行解析，该结果不会缓存
-    */
-    hi = http_query(node, &ttl);
-    if (NULL == hi) {
         goto SYS_DNS;
     }
 
@@ -352,7 +397,6 @@ dp_getaddrinfo(const char *node, const char *service,
 
     if (service != NULL && service[0] == '*' && service[1] == 0)
         service = NULL;
-    
 
     if (service != NULL) {
         if (is_integer(service))
@@ -382,6 +426,15 @@ dp_getaddrinfo(const char *node, const char *service,
         port = htons(0);
     }
 
+    /*
+    * 首先使用HttpDNS向D+服务器进行请求,
+    * 如果失败则调用系统接口进行解析，该结果不会缓存
+    */
+    hi = http_query(node, &ttl);
+    if (NULL == hi) {
+        goto SYS_DNS;
+    }
+
     ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
     printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
     host_info_clear(hi);
@@ -389,8 +442,15 @@ dp_getaddrinfo(const char *node, const char *service,
 
 SYS_DNS:
     *res = NULL;
-    ret = getaddrinfo(node, service, hints, res);
+    ret = getaddrinfo(node, service, hints, &answer);
     printf("SYS_DNS: ret = %d, node = %s\n", ret, node);
+    if (ret == 0) {
+        *res = dup_addrinfo(answer);
+        freeaddrinfo(answer);
+        if (*res == NULL) {
+            return EAI_MEMORY;
+        }
+    }
 
 RET:
     #ifdef WIN32
@@ -426,7 +486,7 @@ void test(int argc, char *argv[]) {
     ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
     printf("ret = %d\n", ret);
     print_addrinfo(ailist); 
-    if(ailist) freeaddrinfo(ailist);
+    if(ailist) dp_freeaddrinfo(ailist);
 }
 
 int main(int argc, char *argv[]) {
