@@ -1,10 +1,4 @@
-/*
- * dnspod域名解析服务
- * github: https://github.com/Jason886/dnspod_plus.git
- * reflink: https://www.dnspod.cn/
- * TODO: 测试在长时间未连接到d+服务器，是否能够超时返回,超时时间是多少
- * TODO: 测试在长时间未收到d+数据时，是否能够超时返回，超时时间是多少
- */
+#ifdef WIN32
 
 static char * 
 widechar_to_byte(LPCWSTR widestr) {
@@ -197,21 +191,16 @@ dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
     time_t ttl;
     struct addrinfoW *answer;
     char * node, *service;
-    #ifdef WIN32
-        WSADATA wsa;
-    #endif
+    WSADATA wsa;
 
     if (node_w == NULL)
         return EAI_NONAME;
     node = widechar_to_byte(node_w);
+    service = widechar_to_byte(service_w);
     if (node == NULL)
         return EAI_NONAME;
 
-    service = widechar_to_byte(service_w);
-
-    #ifdef WIN32
-        WSAStartup(MAKEWORD(2, 2), &wsa);
-    #endif
+    WSAStartup(MAKEWORD(2, 2), &wsa);
 
     printf("!!!! node = %s\n", node);
     *res = NULL;
@@ -305,22 +294,18 @@ SYS_DNS:
     }
 
 RET:
-    #ifdef WIN32
-        WSACleanup();
-    #endif
+    WSACleanup();
     return ret;
 }
 
 #ifdef __TEST
-void test(int argc, char *argv[]) {
+void test_w(int argc, char *argv[]) {
     struct addrinfo hints;
     struct addrinfo *ailist;
     int ret;
     char *node;
-    #ifdef WIN32
-        WSADATA wsa;
-        WSAStartup(MAKEWORD(2, 2), &wsa);
-    #endif
+    WSADATA wsa;
+    WSAStartup(MAKEWORD(2, 2), &wsa);
 
     if(argc < 2) {
         node = "www.baidu.com";
@@ -335,15 +320,12 @@ void test(int argc, char *argv[]) {
     hints.ai_protocol = IPPROTO_TCP;
     hints.ai_flags = 0;
 
-    ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
+    ret = dp_getaddrinfo_w(node, NULL, &hints, &ailist);
     printf("ret = %d\n", ret);
     print_addrinfo(ailist); 
     if(ailist) dp_freeaddrinfo_w(ailist);
 }
 
-int main(int argc, char *argv[]) {
-    test(argc, argv);
-    return 0;
-}
+#endif
 
 #endif
