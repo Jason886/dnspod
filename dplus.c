@@ -1,5 +1,6 @@
 /*
  * dnspod域名解析服务
+ * github: https://github.com/Jason886/dnspod_plus.git
  * reflink: https://www.dnspod.cn/
  * TODO: 测试在长时间未连接到d+服务器，是否能够超时返回,超时时间是多少
  * TODO: 测试在长时间未收到d+数据时，是否能够超时返回，超时时间是多少
