@@ -1,8 +1,8 @@
 /*
  * dnspod域名解析服务
  * reflink: https://www.dnspod.cn/
- * TODO: 测试在长时间未连接到服务器，是否能够超时返回,超时时间是多少
- * TODO: 测试在长时间未收到数据时，是否能够超时返回，超时时间是多少
+ * TODO: 测试在长时间未连接到d+服务器，是否能够超时返回,超时时间是多少
+ * TODO: 测试在长时间未收到d+数据时，是否能够超时返回，超时时间是多少
  */
 
 #include <string.h>
@@ -24,7 +24,6 @@
 #include <sys/select.h>
 #endif
 
-
 #ifndef NULL
 #define NULL 0
 #endif
@@ -35,60 +34,22 @@
 #define HTTPDNS_DEFAULT_SERVER "119.29.29.29"
 #define HTTPDNS_DEFAULT_PORT   80
 #define HTTP_DEFAULT_DATA_SIZE 1024
-#define INVALID_DES_ID -1
 #define DES_KEY_SIZE 8
-#define IP_BUFFER_SIZE 128
 
-static uint32_t des_id = INVALID_DES_ID;
+static uint32_t des_id = -1;
 static char des_key[DES_KEY_SIZE] = { 0 };
 static uint32_t des_used = 0;
 
 struct host_info {
-    /* host address type: AF_INET or AF_INET6 */
-    int h_addrtype;
-    /* length of address in bytes:
-          sizeof(struct in_addr) or sizeof(struct in6_addr)
-    */
-    int h_length;
-    /* length of addr list */
-    int addr_list_len;
-    /* list of addresses */
-    char **h_addr_list;
+    int h_addrtype; /* host address type: AF_INET or AF_INET6 */
+    int h_length; /* length of address in bytes: 
+                     sizeof(struct in_addr) or sizeof(struct in6_addr) */
+    int addr_list_len; /* length of addr list */
+    char **h_addr_list; /* list of addresses */
 };
 
-/*
-int aiengine_getaddrinfo(const char *hostname, const char *service, \
-        const struct addrinfo *hints, struct addrinfo **result) {
-    char ip[IP_BUFFER_SIZE];
-    int isIP = 1;
-    int i = 0;
-    int ret = 0;
-
-    isIP = 1;
-    for(i=0; i<strlen(hostname); i++) {
-        if(hostname[i] == ':') {
-            isIP = 1;
-            break;
-        }
-        if(hostname[i] != '.' && hostname[i] < '0' && hostname[i] > '9') {
-            isIP = 0;
-        }
-    }
-
-    if(isIP) {
-        return getaddrinfo(hostname, service, hints, result);
-    }
-
-    memset(ip, 0x00, sizeof(ip));
-    ret = dns_pod((char *)hostname, 0, 0, 0, 0, ip, 0);
-    if(ret < 0 || strlen(ip) == 0) {
-        return getaddrinfo(hostname, service, hints, result);
-    }
-    return getaddrinfo(ip, service, hints, result);
-}
-*/
-
-static int strchr_num(const char *str, char c) {
+static int 
+strchr_num(const char *str, char c) {
     int count = 0;
     while (*str){
         if (*str++ == c){
@@ -98,20 +59,20 @@ static int strchr_num(const char *str, char c) {
     return count;
 }
 
-static int is_address(const char *s) {
+static int 
+is_address(const char *s) {
     unsigned char buf[sizeof(struct in6_addr)];
     int r;
-    
     r = inet_pton(AF_INET, s, buf);
     if (r <= 0) {
         r = inet_pton(AF_INET6, s, buf);
         return (r > 0);
     }
-    
     return 1;
 }
 
-static int is_integer(const char *s) {
+static int 
+is_integer(const char *s) {
     if (*s == '-' || *s == '+')
         s++;
     if (*s < '0' || '9' < *s)
@@ -122,7 +83,8 @@ static int is_integer(const char *s) {
     return (*s == '\0');
 }
 
-static void host_info_clear(struct host_info *host) {
+static void 
+host_info_clear(struct host_info *host) {
     int i;
     for (i = 0; i < host->addr_list_len; i++) {
         if (host->h_addr_list[i]) {
@@ -133,7 +95,8 @@ static void host_info_clear(struct host_info *host) {
     free(host);
 }
 
-static struct host_info *http_query(const char *node, time_t *ttl) {
+static struct host_info *
+http_query(const char *node, time_t *ttl) {
     int i, ret, sockfd;
     struct host_info *hi;
     char http_data[HTTP_DEFAULT_DATA_SIZE + 1];
@@ -278,9 +241,8 @@ error:
     return NULL;
 }
 
-static struct addrinfo *malloc_addrinfo(int port, uint32_t addr,
-            int socktype, int proto) 
-{
+static struct addrinfo *
+malloc_addrinfo(int port, uint32_t addr, int socktype, int proto) {
     struct addrinfo *ai;
     struct sockaddr_in *sa_in;
     size_t socklen;
@@ -309,25 +271,9 @@ static struct addrinfo *malloc_addrinfo(int port, uint32_t addr,
     return ai;
 }
 
-/*
-void dp_freeaddrinfo(struct addrinfo *ai) {
-    struct addrinfo *next;
-    
-    while (ai != NULL) {
-        if (ai->ai_canonname != NULL)
-            free(ai->ai_canonname);
-        if (ai->ai_addr)
-            free(ai->ai_addr);
-        next = ai->ai_next;
-        free(ai);
-        ai = next;
-    }
-}
-*/
-
-static int fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
-            int port, int socktype, int proto)
-{
+static int 
+fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
+        int port, int socktype, int proto) {
     int i;
     struct addrinfo *cur, *prev = NULL;
     for (i = 0; i < hi->addr_list_len; i++) {
@@ -348,52 +294,14 @@ static int fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
     return 0;
 }
 
-/*
-static struct addrinfo *dup_addrinfo(struct addrinfo *ai) {
-    struct addrinfo *cur, *head = NULL, *prev = NULL;
-    while (ai != NULL) {
-        cur = (struct addrinfo *)malloc(sizeof(struct addrinfo));
-        if (!cur)
-            goto error;
-        
-        memcpy(cur, ai, sizeof(struct addrinfo));
-        
-        cur->ai_addr = (struct sockaddr *)malloc(sizeof(struct sockaddr));
-        if (!cur->ai_addr) {
-            free(cur);
-            goto error;
-        };
-        memcpy(cur->ai_addr, ai->ai_addr, sizeof(struct sockaddr));
-        
-        if (ai->ai_canonname)
-            cur->ai_canonname = strdup(ai->ai_canonname);
-        
-        if (prev)
-            prev->ai_next = cur;
-        else
-            head = cur;
-        prev = cur;
-
-        ai = ai->ai_next;
-    }
-
-    return head;
-
-error:
-    if (head) {
-        dp_freeaddrinfo(head);
-    }
-    return NULL;
-}
-*/
-
-
-int dp_getaddrinfo(const char *node, const char *service,
-    const struct addrinfo *hints, struct addrinfo **res)
-{
+int
+dp_getaddrinfo(const char *node, const char *service,
+    const struct addrinfo *hints, struct addrinfo **res) {
     struct host_info *hi = NULL;
     int port = 0, socktype, proto, ret = 0;
     time_t ttl;
+
+    *res = NULL;
 
     if (node == NULL)
         return EAI_NONAME;
@@ -480,6 +388,7 @@ int dp_getaddrinfo(const char *node, const char *service,
     }
 
     ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
+    return ret;
 
 sys_dns:
     ret = getaddrinfo(node, service, hints, res);
@@ -487,37 +396,35 @@ sys_dns:
 }
 
 #ifdef __TEST
-void test_http_query() {
-    struct addrinfo        hint;
-    struct addrinfo        *ailist;
+void test(int argc, char *argv[]) {
+    struct addrinfo hints;
+    struct addrinfo *ailist;
+    int ret;
+    char *node;
 
-    hint.ai_flags = AI_CANONNAME;
-        hint.ai_family = 0;
-            hint.ai_socktype = 0;
-                hint.ai_protocol = 0;
-                    hint.ai_addrlen = 0;
-                        hint.ai_canonname = NULL;
-                            hint.ai_addr = NULL;
-                                hint.ai_next = NULL;
+    if(argc < 2) {
+        node = "www.baidu.com";
+    }
+    else {
+        node = argv[1];
+    }
 
-    dp_getaddrinfo("www.baidu.com", NULL, &hint, &ailist);
+    memset(&hints, 0x00, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_flags = 0;
 
-    /*
-    hi = http_query("www.baidu.com", &ttl);
-    printf("hi = %p\n", (void *)hi);
+    ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
 
-    if(hi) {
-        for (i = 0; i < hi->addr_list_len; i++) {
-            printf("hi->h_addr_list[%d] = %p\n", i, hi->h_addr_list[i]);
-            printf("hi->h_addr_list[%d] = %s\n", i, hi->h_addr_list[i]);
-        }
-        free(hi);
-    }*/
+    printf("ret = %d\n", ret);
+    if(ailist) freeaddrinfo(ailist);
+
     printf("\n");
 }
 
-int main() {
-    test_http_query();
+int main(int argc, char *argv[]) {
+    test(argc, argv);
     return 0;
 }
 
