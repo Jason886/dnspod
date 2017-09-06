@@ -105,15 +105,8 @@ http_query(const char *node, time_t *ttl) {
     char *comma_ptr;
     char * node_en;
 
-#ifdef WIN32
-    WSADATA wsa;
-    WSAStartup(MAKEWORD(2, 2), &wsa);
-#endif
     sockfd = make_connection(HTTPDNS_DEFAULT_SERVER, HTTPDNS_DEFAULT_PORT);
     if (sockfd < 0) {
-#ifdef WIN32
-        WSACleanup();
-#endif
         return NULL;
     }
 
@@ -130,7 +123,6 @@ http_query(const char *node, time_t *ttl) {
     if (ret < 0){
 #ifdef WIN32
         closesocket(sockfd);
-        WSACleanup();
 #else
         close(sockfd);
 #endif
@@ -145,18 +137,12 @@ http_query(const char *node, time_t *ttl) {
 #endif
 
     if (ret < 0) {
-#ifdef WIN32
-        WSACleanup();
-#endif
         return NULL;
     }
 
     if (des_used) {
         http_data_ptr = des_decode_hex(http_data, des_key, NULL); 
         if (NULL == http_data_ptr) {
-#ifdef WIN32
-            WSACleanup();
-#endif
             return NULL;
         }
         http_data_ptr_head = http_data_ptr;
@@ -180,9 +166,6 @@ http_query(const char *node, time_t *ttl) {
         if(des_used) {
             free(http_data_ptr_head);
         }
-#ifdef WIN32
-        WSACleanup();
-#endif
         return NULL;
     }
 
@@ -197,6 +180,7 @@ http_query(const char *node, time_t *ttl) {
         goto error;
     }
 
+    memset(hi->h_addr_list, 0x00, hi->addr_list_len * sizeof(char *));
     for (i = 0; i < hi->addr_list_len; ++i) {
         char *addr;
         char *ipstr = http_data_ptr;
@@ -226,15 +210,9 @@ http_query(const char *node, time_t *ttl) {
     if (des_used)
         free(http_data_ptr_head);
 
-#ifdef WIN32
-    WSACleanup();
-#endif
     return hi;
 
 error:
-#ifdef WIN32
-    WSACleanup();
-#endif
     if (des_used)
         free(http_data_ptr_head);
 
@@ -269,6 +247,24 @@ malloc_addrinfo(int port, uint32_t addr, int socktype, int proto) {
     sa_in->sin_addr.s_addr = addr;
     
     return ai;
+}
+
+void print_addrinfo(struct addrinfo *ai) {
+    printf("addrinfo: %p\n", (void *)ai);
+    if(ai) {
+        printf("ai_flags = %d\n", ai->ai_flags);
+        printf("ai_family = %d\n", ai->ai_family);
+        printf("ai_socktype = %d\n", ai->ai_socktype);
+        printf("ai_protocol = %d\n", ai->ai_protocol);
+        printf("ai_addrlen = %d\n", ai->ai_addrlen);
+        printf("ai_canonname = (%p) %s\n", (void*)(ai->ai_canonname), ai->ai_canonname);
+        printf("ai_addr = %p\n", (void *)(ai->ai_addr));
+        printf("ai_next = %p\n", (void*)(ai->ai_next));
+    }
+    printf("\n");
+    if(ai->ai_next) {
+        print_addrinfo(ai->ai_next);
+    }
 }
 
 static int 
@@ -388,6 +384,8 @@ dp_getaddrinfo(const char *node, const char *service,
 
     ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
     printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
+    host_info_clear(hi);
+    print_addrinfo(*res); 
     if(ret == 0) goto RET;
 
 SYS_DNS:
