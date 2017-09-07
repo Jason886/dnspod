@@ -13,11 +13,11 @@ static LPCWSTR strdup_w(LPCWSTR widestr) {
     int len;
     LPCWSTR ret = 0;
     if(!widestr) return NULL;
-    len = strlen(widestr);
+    len = strlen_w(widestr);
     if(len > 0) {
-        ret = malloc((len+1)*sizeof(wchar));
-        memset(ret, 0x00, (len+1)*sizeof(wchar));
-        memcpy(ret, widestr, len*sizeof(wchar));
+        ret = malloc((len+1)*sizeof(WCHAR));
+        memset(ret, 0x00, (len+1)*sizeof(WCHAR));
+        memcpy(ret, widestr, len*sizeof(WCHAR));
     }
     return ret;
 }
@@ -293,6 +293,9 @@ void test_w(int argc, char *argv[]) {
     struct addrinfo *ailist;
     int ret;
     char *node, node_w[300];
+	int len;
+	char * node2;
+	int i;
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
 
@@ -313,8 +316,8 @@ void test_w(int argc, char *argv[]) {
             );
 
     node = node_w;
-
-    strlen_w(node);
+	
+	return;
 
     memset(&hints, 0x00, sizeof(hints));
     hints.ai_family = AF_INET;
