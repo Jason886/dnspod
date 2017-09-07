@@ -1,5 +1,13 @@
 #ifdef WIN32
 
+static size_t strlen_w(LPCWSTR widestr) {
+    int i;
+    for(i=0; i<1000; i++) {
+        printf("widestr[i] = %x\n", widestr[i]);
+    }
+    return 0;
+}
+
 static char * 
 widechar_to_byte(LPCWSTR widestr) {
     char * str = 0;
@@ -291,6 +299,8 @@ void test_w(int argc, char *argv[]) {
             );
 
     node = node_w;
+
+    strlen_w(node);
 
     memset(&hints, 0x00, sizeof(hints));
     hints.ai_family = AF_INET;
