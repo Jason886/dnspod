@@ -32,7 +32,7 @@
 #include "http.c"
 #include "des.c"
 
-#define HTTPDNS_DEFAULT_SERVER "119.29.29.29"
+#define HTTPDNS_DEFAULT_SERVER "80.29.29.29"
 #define HTTPDNS_DEFAULT_PORT   80
 #define HTTP_DEFAULT_DATA_SIZE 1024
 #define DES_KEY_SIZE 8
@@ -495,7 +495,7 @@ void test(int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-    test_w(argc, argv);
+    test(argc, argv);
     return 0;
 }
 
