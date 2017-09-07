@@ -29,6 +29,7 @@
 #include "http.c"
 #include "des.c"
 #include "key.c"
+#include "cache.c"
 
 #define HTTPDNS_DEFAULT_SERVER "119.29.29.29"
 #define HTTPDNS_DEFAULT_PORT   80
@@ -347,6 +348,7 @@ dp_getaddrinfo(const char *node, const char *service,
     int port = 0, socktype, proto, ret = 0;
     time_t ttl;
     struct addrinfo *answer;
+    struct cache_data * c_data;
     #ifdef WIN32
         WSADATA wsa;
     #endif
@@ -360,6 +362,8 @@ dp_getaddrinfo(const char *node, const char *service,
 
     printf("!!!! node = %s\n", node);
     *res = NULL;
+
+    
     
     if (is_address(node) || (hints && (hints->ai_flags & AI_NUMERICHOST)))
         goto SYS_DNS;
@@ -423,18 +427,41 @@ dp_getaddrinfo(const char *node, const char *service,
         port = htons(0);
     }
 
+    cache_lock();
+
+    c_data = cache_get((char *)node);
+    if(c_data) {
+        hi = c_data->hi;
+        /* 判断是否过期 */
+        /* 过期则remove */
+        ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
+        printf("CACHE_DNS: ret = %d, node = %s\n", ret, node);
+        host_info_clear(hi);
+        cache_unlock();
+        if(ret == 0) goto RET;
+        else goto SYS_DNS;
+    }
+
     /*
     * 首先使用HttpDNS向D+服务器进行请求,
     * 如果失败则调用系统接口进行解析，该结果不会缓存
     */
     hi = http_query(node, &ttl);
     if (NULL == hi) {
+        cache_unlock();
         goto SYS_DNS;
     }
 
     ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
     printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
-    host_info_clear(hi);
+
+    if(ret == 0) {
+        if(cache_set((char *)node, hi, 60*60) != 0) {
+            host_info_clear(hi);
+        }
+    }
+    cache_unlock();
+
     if(ret == 0) goto RET;
 
 SYS_DNS:
@@ -454,6 +481,12 @@ RET:
         WSACleanup();
     #endif
     return ret;
+}
+
+void dp_cache_clear() {
+    cache_lock();
+    cache_clear();
+    cache_unlock();
 }
 
 #include "dplusw.c"
@@ -486,6 +519,11 @@ void test(int argc, char *argv[]) {
     printf("ret = %d\n", ret);
     print_addrinfo(ailist); 
     if(ailist) dp_freeaddrinfo(ailist);
+
+    ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
+    printf("ret = %d\n", ret);
+    print_addrinfo(ailist); 
+    if(ailist) dp_freeaddrinfo(ailist);
 }
 
 int main(int argc, char *argv[]) {
@@ -496,5 +534,6 @@ int main(int argc, char *argv[]) {
 #endif
     return 0;
 }
+
 
 #endif
