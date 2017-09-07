@@ -495,7 +495,11 @@ void test(int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
+#ifdef WIN32
     test_w(argc, argv);
+#else
+    test(argc, argv);
+#endif
     return 0;
 }
 
