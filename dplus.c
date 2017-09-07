@@ -490,7 +490,6 @@ void test(int argc, char *argv[]) {
 
     ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
     printf("ret = %d\n", ret);
-    printf("ailist = %p\n", ailist);
     print_addrinfo(ailist); 
     if(ailist) dp_freeaddrinfo(ailist);
 }
