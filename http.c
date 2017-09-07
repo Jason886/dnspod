@@ -98,14 +98,14 @@ wait_connected(int *fd) {
     if (FD_ISSET(c_fd, &rset)) {
         int error;
         socklen_t len = sizeof (error);
-        if (getsockopt(c_fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+        if (getsockopt(c_fd, SOL_SOCKET, SO_ERROR, (void *)&error, &len) < 0) {
             return -1;
         }
     }
     if (FD_ISSET(c_fd, &wset)) {
         int error;
         socklen_t len = sizeof (error);
-        if (getsockopt(c_fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+        if (getsockopt(c_fd, SOL_SOCKET, SO_ERROR, (void *)&error, &len) < 0) {
             return -1;
         }
     }
@@ -184,9 +184,11 @@ static int make_connection(char *serv_ip, int port)
 {
     int sockfd, ret;
     struct sockaddr_in serv_addr;
-    int flags;
+    
     #ifdef WIN32
 	unsigned long mode = 1;
+	#else
+	int flags;
     #endif
 
     serv_addr.sin_family = AF_INET;

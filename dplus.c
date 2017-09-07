@@ -254,7 +254,7 @@ void print_addrinfo(struct addrinfo *ai) {
         printf("ai_family = %d\n", ai->ai_family);
         printf("ai_socktype = %d\n", ai->ai_socktype);
         printf("ai_protocol = %d\n", ai->ai_protocol);
-        printf("ai_addrlen = %d\n", ai->ai_addrlen);
+        printf("ai_addrlen = %lu\n", (unsigned long) (ai->ai_addrlen));
         printf("ai_canonname = (%p) %s\n", (void*)(ai->ai_canonname), ai->ai_canonname);
         printf("ai_addr = %p\n", (void *)(ai->ai_addr));
         printf("ai_next = %p\n", (void*)(ai->ai_next));

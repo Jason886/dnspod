@@ -10,10 +10,10 @@ strlen_w(LPCWSTR wstr) {
     return len;
 }
 
-static LPCWSTR 
+static LPWSTR 
 strdup_w(LPCWSTR wstr) {
     size_t len;
-    LPCWSTR ret = 0;
+    LPWSTR ret = 0;
     if(!wstr) return NULL;
     len = strlen_w(wstr);
     if(len > 0) {
@@ -88,8 +88,8 @@ void print_addrinfo_w(struct addrinfoW *ai) {
         printf("ai_family = %d\n", ai->ai_family);
         printf("ai_socktype = %d\n", ai->ai_socktype);
         printf("ai_protocol = %d\n", ai->ai_protocol);
-        printf("ai_addrlen = %d\n", ai->ai_addrlen);
-        printf("ai_canonname = (%p) %s\n", (void*)(ai->ai_canonname), ai->ai_canonname);
+        printf("ai_addrlen = %lu\n", (unsigned long)(ai->ai_addrlen) );
+        wprintf(L"ai_canonname = (%p) %s\n", (void*)(ai->ai_canonname), ai->ai_canonname);
         printf("ai_addr = %p\n", (void *)(ai->ai_addr));
         printf("ai_next = %p\n", (void*)(ai->ai_next));
 		printf("\n");
@@ -180,16 +180,15 @@ fillin_addrinfoW_res(struct addrinfoW **res, struct host_info *hi,
 int
 dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
     const struct addrinfoW *hints, struct addrinfoW **res) {
-    struct host_info *hi = NULL;
-    int port = 0, socktype, proto, ret = 0;
+	char *node = NULL, *service = NULL;
+	struct host_info *hi = NULL;
+	int port = 0, socktype, proto, ret = 0;
     time_t ttl;
     struct addrinfoW *answer = NULL;
-    char *node = NULL, *service = NULL;
     WSADATA wsa;
 
     node = widechar_to_byte(node_w);
-    if (node == NULL)
-        return EAI_NONAME;
+    if (!node) return EAI_NONAME;
 	service = widechar_to_byte(service_w);
 
     WSAStartup(MAKEWORD(2, 2), &wsa);
@@ -296,13 +295,12 @@ RET:
 
 #ifdef __TEST
 void test_w(int argc, char *argv[]) {
-    struct addrinfo hints;
-    struct addrinfo *ailist;
-    int ret;
-    char *node, node_w[300];
-	int len;
-	char * node2;
-	int i;
+    struct addrinfoW hints;
+    struct addrinfoW *ailist;
+    char *node;
+	WCHAR node_w[1024];
+	int ret;
+	
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
 
@@ -318,10 +316,8 @@ void test_w(int argc, char *argv[]) {
             node,
             -1,
             node_w,
-            200
+            1000
             );
-
-    node = node_w;
 
     memset(&hints, 0x00, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -329,9 +325,9 @@ void test_w(int argc, char *argv[]) {
     hints.ai_protocol = IPPROTO_TCP;
     hints.ai_flags = 0;
 
-    ret = dp_getaddrinfo_w(node, NULL, &hints, &ailist);
+    ret = dp_getaddrinfo_w(node_w, NULL, &hints, &ailist);
     printf("ret = %d\n", ret);
-    print_addrinfo(ailist); 
+    print_addrinfo_w(ailist); 
     if(ailist) dp_freeaddrinfo_w(ailist);
 }
 
