@@ -185,7 +185,9 @@ static int make_connection(char *serv_ip, int port)
     int sockfd, ret;
     struct sockaddr_in serv_addr;
     int flags;
+    #ifdef WIN32
 	unsigned long mode = 1;
+    #endif
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
