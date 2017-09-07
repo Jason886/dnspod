@@ -1,11 +1,25 @@
 #ifdef WIN32
 
 static size_t strlen_w(LPCWSTR widestr) {
-    int i;
-    for(i=0; i<1000; i++) {
-        printf("widestr[i] = %x\n", widestr[i]);
+    int i = 0;
+    if(!widestr) return 0;
+    while(widestr[i] != 0) {
+        i++;
     }
-    return 0;
+    return i;
+}
+
+static LPCWSTR strdup_w(LPCWSTR widestr) {
+    int len;
+    LPCWSTR ret = 0;
+    if(!widestr) return NULL;
+    len = strlen(widestr);
+    if(len > 0) {
+        ret = malloc((len+1)*sizeof(wchar));
+        memset(ret, 0x00, (len+1)*sizeof(wchar));
+        memcpy(ret, widestr, len*sizeof(wchar));
+    }
+    return ret;
 }
 
 static char * 
@@ -115,7 +129,7 @@ addrinfoW *dup_addrinfo_w(struct addrinfoW *ai) {
         memcpy(cur->ai_addr, ai->ai_addr, sizeof(struct sockaddr));
 
         if (ai->ai_canonname)
-            cur->ai_canonname = StrDupW(ai->ai_canonname);
+            cur->ai_canonname = strdup_w(ai->ai_canonname);
 
         if (prev)
             prev->ai_next = cur;
