@@ -185,6 +185,7 @@ static int make_connection(char *serv_ip, int port)
     int sockfd, ret;
     struct sockaddr_in serv_addr;
     int flags;
+	unsigned long mode = 1;
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
@@ -198,7 +199,13 @@ static int make_connection(char *serv_ip, int port)
         fprintf(stderr, "create socket error\n");
         return -1;
     }
-
+	
+#ifdef WIN32
+	if(ioctlsocket(sockfd, FIONBIO, (unsigned long *)&mode) != 0) {
+		fprintf(stderr, "ioctlsocket error\n");
+        return -1; 
+	}
+#else 
     flags = fcntl(sockfd, F_GETFL, 0);
     if(flags < 0) {
         fprintf(stderr, "fcntl error\n");
@@ -208,11 +215,16 @@ static int make_connection(char *serv_ip, int port)
         fprintf(stderr, "fcntl error\n");
         return -1;
     }
+#endif
 
     ret = connect(sockfd, (struct sockaddr *)&serv_addr,
         sizeof(struct sockaddr));
-    while(ret < 0) {
+    while(ret != 0) {
+		#ifdef WIN32
+		if( WSAGetLastError() == WSAEWOULDBLOCK) {
+		#else
         if( errno == EINPROGRESS ) {
+		#endif
             break;
         }  else {
             fprintf(stderr, "connect socket error\n");
@@ -226,7 +238,7 @@ static int make_connection(char *serv_ip, int port)
 #else
         close(sockfd);
 #endif
-        fprintf(stderr, "connect socket error\n");
+        fprintf(stderr, "wait_connected error\n");
         return -1;
     }
 
