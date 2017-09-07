@@ -1,5 +1,5 @@
-# 封装dnspod域名解析服务
-reflink: https://www.dnspod.cn/
+# 封装dnspod基于http的域名解析服务
+dnspod: https://www.dnspod.cn/
 
 build:
 1.linux:
