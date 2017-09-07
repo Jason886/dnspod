@@ -82,8 +82,8 @@ malloc_addrinfo_w(int port, uint32_t addr, int socktype, int proto) {
 }
 
 void print_addrinfo_w(struct addrinfoW *ai) {
-    printf("addrinfoW: %p\n", (void *)ai);
     if(ai) {
+		printf("addrinfoW: %p\n", (void *)ai);
         printf("ai_flags = %d\n", ai->ai_flags);
         printf("ai_family = %d\n", ai->ai_family);
         printf("ai_socktype = %d\n", ai->ai_socktype);
@@ -92,11 +92,14 @@ void print_addrinfo_w(struct addrinfoW *ai) {
         printf("ai_canonname = (%p) %s\n", (void*)(ai->ai_canonname), ai->ai_canonname);
         printf("ai_addr = %p\n", (void *)(ai->ai_addr));
         printf("ai_next = %p\n", (void*)(ai->ai_next));
+		printf("\n");
+		if(ai->ai_next) {
+			print_addrinfo_w(ai->ai_next);
+		}
     }
-    printf("\n");
-    if(ai->ai_next) {
-        print_addrinfo_w(ai->ai_next);
-    }
+	else {
+		printf("addrinfoW: %p\n", (void *)ai);
+	}
 }
 
 void
