@@ -1,34 +1,36 @@
 #ifdef WIN32
 
-static size_t strlen_w(LPCWSTR widestr) {
-    int i = 0;
-    if(!widestr) return 0;
-    while(widestr[i] != 0) {
-        i++;
+static size_t 
+strlen_w(LPCWSTR wstr) {
+    size_t len = 0;
+    if(!wstr) return 0;
+    while(wstr[len]) {
+        len++;
     }
-    return i;
+    return len;
 }
 
-static LPCWSTR strdup_w(LPCWSTR widestr) {
-    int len;
+static LPCWSTR 
+strdup_w(LPCWSTR wstr) {
+    size_t len;
     LPCWSTR ret = 0;
-    if(!widestr) return NULL;
-    len = strlen_w(widestr);
+    if(!wstr) return NULL;
+    len = strlen_w(wstr);
     if(len > 0) {
         ret = malloc((len+1)*sizeof(WCHAR));
         memset(ret, 0x00, (len+1)*sizeof(WCHAR));
-        memcpy(ret, widestr, len*sizeof(WCHAR));
+        memcpy(ret, wstr, len*sizeof(WCHAR));
     }
     return ret;
 }
 
 static char * 
-widechar_to_byte(LPCWSTR widestr) {
-    char * str = 0;
-    int len;
+widechar_to_byte(LPCWSTR wstr) {
+    char * str = NULL;
+    size_t len;
     len = WideCharToMultiByte(CP_UTF8,
                         0,
-                        widestr,
+                        wstr,
                         -1,
                         NULL,
                         0,
@@ -39,7 +41,7 @@ widechar_to_byte(LPCWSTR widestr) {
         memset(str, 0x00, len+1);
         WideCharToMultiByte(CP_UTF8,
                             0,
-                            widestr,
+                            wstr,
                             -1,
                             str,
                             len,
@@ -111,8 +113,8 @@ dp_freeaddrinfo_w(struct addrinfoW *ai) {
     }
 }
 
-static struct 
-addrinfoW *dup_addrinfo_w(struct addrinfoW *ai) {
+static struct addrinfoW *
+dup_addrinfo_w(struct addrinfoW *ai) {
     struct addrinfoW *cur, *head = NULL, *prev = NULL;
     while (ai != NULL) {
         cur = (struct addrinfoW *)malloc(sizeof(struct addrinfoW));
@@ -178,16 +180,14 @@ dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
     struct host_info *hi = NULL;
     int port = 0, socktype, proto, ret = 0;
     time_t ttl;
-    struct addrinfoW *answer;
-    char * node, *service;
+    struct addrinfoW *answer = NULL;
+    char *node = NULL, *service = NULL;
     WSADATA wsa;
 
-    if (node_w == NULL)
-        return EAI_NONAME;
     node = widechar_to_byte(node_w);
-    service = widechar_to_byte(service_w);
     if (node == NULL)
         return EAI_NONAME;
+	service = widechar_to_byte(service_w);
 
     WSAStartup(MAKEWORD(2, 2), &wsa);
 
@@ -278,12 +278,16 @@ SYS_DNS:
         *res = dup_addrinfo_w(answer);
         FreeAddrInfoW(answer);
         if (*res == NULL) {
+			if(node) free(node);
+			if(service) free(service);
             return EAI_MEMORY;
         }
     }
 
 RET:
     WSACleanup();
+	if(node) free(node);
+	if(service) free(service);
     return ret;
 }
 
@@ -306,7 +310,6 @@ void test_w(int argc, char *argv[]) {
         node = argv[1];
     }
 
-
     MultiByteToWideChar(CP_UTF8,
             0,
             node,
@@ -316,8 +319,6 @@ void test_w(int argc, char *argv[]) {
             );
 
     node = node_w;
-	
-	return;
 
     memset(&hints, 0x00, sizeof(hints));
     hints.ai_family = AF_INET;
