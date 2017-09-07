@@ -492,7 +492,7 @@ void test(int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-    test(argc, argv);
+    test_w(argc, argv);
     return 0;
 }
 

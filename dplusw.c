@@ -303,7 +303,7 @@ void test_w(int argc, char *argv[]) {
     struct addrinfo hints;
     struct addrinfo *ailist;
     int ret;
-    char *node;
+    char *node, node_w[300];
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
 
@@ -313,6 +313,17 @@ void test_w(int argc, char *argv[]) {
     else {
         node = argv[1];
     }
+
+
+    MultiByteToWideChar(CP_UTF8,
+            0,
+            node,
+            -1,
+            node_w,
+            200
+            );
+
+    node = node_w;
 
     memset(&hints, 0x00, sizeof(hints));
     hints.ai_family = AF_INET;
