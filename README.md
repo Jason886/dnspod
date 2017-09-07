@@ -8,3 +8,10 @@ build:
     gcc -D_GNU_SOURCE -D__TEST -std=c89 -pedantic -Wall -Wextra dplus.c
 3.win:(need mingw)
     gcc -DWIN32 -D__TEST -std=c89 -pedantic -Wall -Wextra dplus.c -l wsock32 -lWs2_32
+
+
+    todo:
+    1.lock
+    2.windows cache
+    3.cache key = domain+port
+    4.处理malloc alloc realloc失败
