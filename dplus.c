@@ -1,6 +1,5 @@
 /*
  * dnspod+域名解析服务
- * github: https://github.com/Jason886/dnspod_plus.git
  * dnspod: https://www.dnspod.cn/
  */
 
@@ -29,15 +28,11 @@
 
 #include "http.c"
 #include "des.c"
+#include "key.c"
 
 #define HTTPDNS_DEFAULT_SERVER "119.29.29.29"
 #define HTTPDNS_DEFAULT_PORT   80
 #define HTTP_DEFAULT_DATA_SIZE 1024
-#define DES_KEY_SIZE 8
-
-static uint32_t des_id = -1;
-static char des_key[DES_KEY_SIZE] = { 0 };
-static uint32_t des_used = 0;
 
 struct host_info {
     int h_addrtype; /* host address type: AF_INET or AF_INET6 */
@@ -144,6 +139,7 @@ http_query(const char *node, time_t *ttl) {
             return NULL;
         }
         http_data_ptr_head = http_data_ptr;
+        printf("http_data_ptr: %s\n", http_data_ptr);
     }
     else {
         http_data_ptr = http_data;
@@ -474,7 +470,7 @@ void test(int argc, char *argv[]) {
     #endif
 
     if(argc < 2) {
-        node = "www.baidu.com";
+        node = "api.chivox.com";
     }
     else {
         node = argv[1];
