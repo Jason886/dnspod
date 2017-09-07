@@ -22,6 +22,8 @@
     #include <unistd.h>
     #include <sys/select.h>
     #include <strings.h>
+    #include <fcntl.h>
+    #include <errno.h>
 #endif
 
 #define CHUNK_SIZE 1024
@@ -78,6 +80,37 @@ static const char *inet_ntop(int af, const void *src, char *dst, socklen_t size)
           dst : NULL;
 }
 #endif
+
+static int 
+wait_connected(int *fd) {
+    int c_fd = *fd;
+    fd_set rset, wset;
+    struct timeval tval = {HTTP_DEFAULT_TIMEOUT, 0};
+    int ready_n;
+
+    FD_ZERO(&rset);
+    FD_SET(c_fd, &rset);
+    wset = rset;
+    if ((ready_n = select(c_fd + 1, &rset, &wset, NULL, &tval)) == 0) {
+        fprintf(stderr, "select timeout.\n");
+        return (-1);
+    }
+    if (FD_ISSET(c_fd, &rset)) {
+        int error;
+        socklen_t len = sizeof (error);
+        if (getsockopt(c_fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+            return -1;
+        }
+    }
+    if (FD_ISSET(c_fd, &wset)) {
+        int error;
+        socklen_t len = sizeof (error);
+        if (getsockopt(c_fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+            return -1;
+        }
+    }
+    return 0;
+}
 
 static int wait_event(int sockfd, struct timeval *timeout, int read, int write)
 {
@@ -151,6 +184,7 @@ static int make_connection(char *serv_ip, int port)
 {
     int sockfd, ret;
     struct sockaddr_in serv_addr;
+    int flags;
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
@@ -165,9 +199,33 @@ static int make_connection(char *serv_ip, int port)
         return -1;
     }
 
+    flags = fcntl(sockfd, F_GETFL, 0);
+    if(flags < 0) {
+        fprintf(stderr, "fcntl error\n");
+        return -1;      
+    }
+    if(fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        fprintf(stderr, "fcntl error\n");
+        return -1;
+    }
+
     ret = connect(sockfd, (struct sockaddr *)&serv_addr,
         sizeof(struct sockaddr));
-    if(ret < 0){
+    while(ret < 0) {
+        if( errno == EINPROGRESS ) {
+            break;
+        }  else {
+            fprintf(stderr, "connect socket error\n");
+            return -1;
+        }
+    }
+
+    if(wait_connected(&sockfd) != 0) {
+#ifdef WIN32
+        closesocket(sockfd);
+#else
+        close(sockfd);
+#endif
         fprintf(stderr, "connect socket error\n");
         return -1;
     }
