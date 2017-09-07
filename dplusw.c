@@ -12,52 +12,19 @@ widechar_to_byte(LPCWSTR widestr) {
                         0,
                         NULL,
                         NULL);
-    str = malloc(len+1);
-    memset(str, 0x00, len+1);
-    WideCharToMultiByte(CP_UTF8,
-                        0,
-                        widestr,
-                        -1,
-                        str,
-                        len,
-                        NULL,
-                        NULL);
-    return str;
-}
-
-static int 
-is_address_w(LPCWSTR s) {
-    unsigned char buf[sizeof(struct in6_addr)];
-    int r;
-    char *ss;
-    ss = widechar_to_byte(s);
-    r = inet_pton(AF_INET, ss, buf);
-    if (r <= 0) {
-        r = inet_pton(AF_INET6, ss, buf);
-        free(ss);
-        return (r > 0);
+    if(len > 0) {
+        str = malloc(len+1);
+        memset(str, 0x00, len+1);
+        WideCharToMultiByte(CP_UTF8,
+                            0,
+                            widestr,
+                            -1,
+                            str,
+                            len,
+                            NULL,
+                            NULL);
     }
-    free(ss);
-    return 1;
-}
-
-static int 
-is_integer_w(LPCWSTR s) {
-    char *ss, *ss_head;
-    int ret;
-    ss_head = ss = widechar_to_byte(s);
-    s = NULL;
-    if (*ss == '-' || *ss == '+')
-        ss++;
-    if (*ss < '0' || '9' < *ss)
-        return 0;
-    ss++;
-    while ('0' <= *ss && *ss <= '9')
-        ss++;
-
-    ret = (*ss == '\0');
-    free(ss_head);
-    return ret;
+    return str;
 }
 
 static struct addrinfoW *
@@ -140,7 +107,7 @@ addrinfoW *dup_addrinfo_w(struct addrinfoW *ai) {
         memcpy(cur->ai_addr, ai->ai_addr, sizeof(struct sockaddr));
 
         if (ai->ai_canonname)
-            cur->ai_canonname = strdup(ai->ai_canonname);
+            cur->ai_canonname = StrDupW(ai->ai_canonname);
 
         if (prev)
             prev->ai_next = cur;
