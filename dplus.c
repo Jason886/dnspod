@@ -250,8 +250,8 @@ malloc_addrinfo(int port, uint32_t addr, int socktype, int proto) {
 }
 
 void print_addrinfo(struct addrinfo *ai) {
-    printf("addrinfo: %p\n", (void *)ai);
     if(ai) {
+        printf("addrinfo: %p\n", (void *)ai);
         printf("ai_flags = %d\n", ai->ai_flags);
         printf("ai_family = %d\n", ai->ai_family);
         printf("ai_socktype = %d\n", ai->ai_socktype);
@@ -260,10 +260,13 @@ void print_addrinfo(struct addrinfo *ai) {
         printf("ai_canonname = (%p) %s\n", (void*)(ai->ai_canonname), ai->ai_canonname);
         printf("ai_addr = %p\n", (void *)(ai->ai_addr));
         printf("ai_next = %p\n", (void*)(ai->ai_next));
+        printf("\n");
+        if(ai->ai_next) {
+            print_addrinfo(ai->ai_next);
+        }
     }
-    printf("\n");
-    if(ai->ai_next) {
-        print_addrinfo(ai->ai_next);
+    else {
+        printf("addrinfo: %p\n", (void *)ai);
     }
 }
 
@@ -487,6 +490,7 @@ void test(int argc, char *argv[]) {
 
     ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
     printf("ret = %d\n", ret);
+    printf("ailist = %p\n", ailist);
     print_addrinfo(ailist); 
     if(ailist) dp_freeaddrinfo(ailist);
 }
