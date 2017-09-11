@@ -82,7 +82,7 @@ map_delete(struct map_t * map) {
 
 static int
 map_set(struct map_t *map, char *key, void *val) {
-    struct map_node_t *n, *p;
+    struct map_node_t *n=NULL, *p=NULL;
     int i;
     
     if(!map) return -1;
