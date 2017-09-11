@@ -460,7 +460,7 @@ dp_getaddrinfo(const char *node, const char *service,
     printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
 
     if(ret == 0) {
-        if(cache_set((char *)node, ntohs(port), hi, ttl*60/4*3) != 0) {
+        if(cache_set((char *)node, ntohs(port), hi, 15) != 0) {
             host_info_clear(hi);
         }
     }
@@ -523,6 +523,8 @@ void test(int argc, char *argv[]) {
     printf("ret = %d\n", ret);
     print_addrinfo(ailist); 
     if(ailist) dp_freeaddrinfo(ailist);
+
+    sleep(20);
 
     ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
     printf("ret = %d\n", ret);
