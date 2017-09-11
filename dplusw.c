@@ -353,6 +353,20 @@ void test_w(int argc, char *argv[]) {
     printf("ret = %d\n", ret);
     print_addrinfo_w(ailist); 
     if(ailist) dp_freeaddrinfo_w(ailist);
+
+    sleep(10);
+
+    ret = dp_getaddrinfo_w(node_w, NULL, &hints, &ailist);
+    printf("ret = %d\n", ret);
+    print_addrinfo_w(ailist); 
+    if(ailist) dp_freeaddrinfo_w(ailist);
+
+    sleep(5);
+
+    ret = dp_getaddrinfo_w(node_w, NULL, &hints, &ailist);
+    printf("ret = %d\n", ret);
+    print_addrinfo_w(ailist); 
+    if(ailist) dp_freeaddrinfo_w(ailist);
 }
 
 #endif
