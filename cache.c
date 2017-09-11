@@ -10,7 +10,7 @@ static pthread_mutex_t cache_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 struct cache_data {
     struct host_info *hi;
-    size_t expire_time; /* secs from 1970 */
+    time_t expire_time; /* secs from 1970 */
 };
 
 static void
@@ -29,12 +29,14 @@ make_cache_key(char *key_buff, size_t key_buff_size, char *domain, int port) {
 }
 
 static struct cache_data *
-make_cache_data(struct host_info *hi, size_t time) {
+make_cache_data(struct host_info *hi, size_t ttl) {
     struct cache_data *data;
+    time_t rawtime;
     data = malloc(sizeof(*data));
     if(data) {
         data->hi = hi;  /* hold, should free at last.*/
-        data->expire_time = /*curtime*/ + time;
+        time(&rawtime);
+        data->expire_time = rawtime + ttl;
     }
     return data;
 }

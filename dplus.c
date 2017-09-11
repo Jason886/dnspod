@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <time.h>
 
 #ifdef WIN32
 #include <winsock2.h>
@@ -347,7 +348,7 @@ dp_getaddrinfo(const char *node, const char *service,
     const struct addrinfo *hints, struct addrinfo **res) {
     struct host_info *hi = NULL;
     int port = 0, socktype, proto, ret = 0;
-    time_t ttl;
+    time_t ttl, rawtime;
     struct addrinfo *answer;
     struct cache_data * c_data;
     #ifdef WIN32
@@ -433,14 +434,16 @@ dp_getaddrinfo(const char *node, const char *service,
     c_data = cache_get((char *)node, ntohs(port));
     if(c_data) {
         hi = c_data->hi;
-        /* 判断是否过期 */
-        /* 过期则remove */
-        ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
-        printf("CACHE_DNS: ret = %d, node = %s\n", ret, node);
-        host_info_clear(hi);
-        cache_unlock();
-        if(ret == 0) goto RET;
-        else goto SYS_DNS;
+        time(&rawtime);
+        if(c_data->expire_time > rawtime) {
+            ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
+            printf("CACHE_DNS: ret = %d, node = %s\n", ret, node);
+            host_info_clear(hi);
+            cache_unlock();
+            if(ret == 0) goto RET;
+            else goto SYS_DNS; 
+        }
+        cache_remove((char *)node, ntohs(port));
     }
 
     /*
@@ -457,7 +460,7 @@ dp_getaddrinfo(const char *node, const char *service,
     printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
 
     if(ret == 0) {
-        if(cache_set((char *)node, ntohs(port), hi, 60*60) != 0) {
+        if(cache_set((char *)node, ntohs(port), hi, ttl*60/4*3) != 0) {
             host_info_clear(hi);
         }
     }
