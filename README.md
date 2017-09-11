@@ -11,7 +11,4 @@ build:
 
 
     todo:
-    1.lock
-    2.windows cache
-    3.cache key = domain+port
-    4.处理malloc alloc realloc失败
+    1.处理malloc alloc realloc失败
