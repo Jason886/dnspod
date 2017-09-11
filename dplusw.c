@@ -183,8 +183,9 @@ dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
 	char *node = NULL, *service = NULL;
 	struct host_info *hi = NULL;
 	int port = 0, socktype, proto, ret = 0;
-    time_t ttl;
+    time_t ttl, rawtime;
     struct addrinfoW *answer = NULL;
+    struct cache_data * c_data;
     WSADATA wsa;
 
     node = widechar_to_byte(node_w);
@@ -257,6 +258,22 @@ dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
     else {
         port = htons(0);
     }
+    
+    cache_lock();
+
+    c_data = cache_get((char *)node, ntohs(port));
+    if(c_data) {
+        hi = c_data->hi;
+        time(&rawtime);
+        if(c_data->expire_time > rawtime) {
+            ret = fillin_addrinfoW_res(res, hi, port, socktype, proto);
+            printf("CACHE_DNS: ret = %d, node = %s\n", ret, node);
+            cache_unlock();
+            if(ret == 0) goto RET;
+            else goto SYS_DNS; 
+        }
+        cache_remove((char *)node, ntohs(port));
+    }
 
     /*
     * 首先使用HttpDNS向D+服务器进行请求,
@@ -264,12 +281,19 @@ dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
     */
     hi = http_query(node, &ttl);
     if (NULL == hi) {
+        cache_unlock();
         goto SYS_DNS;
     }
 
     ret = fillin_addrinfoW_res(res, hi, port, socktype, proto);
     printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
-    host_info_clear(hi);
+
+    /* 缓存时间 3/4*ttl分钟 */
+    if(ret != 0 || cache_set((char *)node, ntohs(port), hi, ttl*60/4*3) != 0) {
+        host_info_clear(hi);
+    }
+    cache_unlock();
+
     if(ret == 0) goto RET;
 
 SYS_DNS:

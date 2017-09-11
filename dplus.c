@@ -364,8 +364,6 @@ dp_getaddrinfo(const char *node, const char *service,
 
     printf("!!!! node = %s\n", node);
     *res = NULL;
-
-    
     
     if (is_address(node) || (hints && (hints->ai_flags & AI_NUMERICHOST)))
         goto SYS_DNS;
@@ -438,7 +436,6 @@ dp_getaddrinfo(const char *node, const char *service,
         if(c_data->expire_time > rawtime) {
             ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
             printf("CACHE_DNS: ret = %d, node = %s\n", ret, node);
-            host_info_clear(hi);
             cache_unlock();
             if(ret == 0) goto RET;
             else goto SYS_DNS; 
@@ -459,11 +456,9 @@ dp_getaddrinfo(const char *node, const char *service,
     ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
     printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
 
-    if(ret == 0) {
-        /* 缓存时间 3/4*ttl分钟 */
-        if(cache_set((char *)node, ntohs(port), hi, ttl*60/4*3) != 0) {
-            host_info_clear(hi);
-        }
+    /* 缓存时间 3/4*ttl分钟 */
+    if(ret != 0 || cache_set((char *)node, ntohs(port), hi, ttl*60/4*3) != 0) {
+        host_info_clear(hi);
     }
     cache_unlock();
 
@@ -526,6 +521,13 @@ void test(int argc, char *argv[]) {
     if(ailist) dp_freeaddrinfo(ailist);
 
     sleep(10);
+
+    ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
+    printf("ret = %d\n", ret);
+    print_addrinfo(ailist); 
+    if(ailist) dp_freeaddrinfo(ailist);
+
+    sleep(1);
 
     ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
     printf("ret = %d\n", ret);
