@@ -1,9 +1,12 @@
 #include "map.c"
 
-static struct map_t *cache = NULL;
+#define KEY_BUFF_SIZE 256
 
 struct host_info;
 static void host_info_clear(struct host_info *host);
+
+static struct map_t *cache = NULL;
+static pthread_mutex_t cache_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 struct cache_data {
     struct host_info *hi;
@@ -12,10 +15,17 @@ struct cache_data {
 
 static void
 cache_lock() {
+    pthread_mutex_lock(&cache_mtx);
 }
 
 static void 
 cache_unlock() {
+    pthread_mutex_unlock(&cache_mtx);
+}
+
+static void
+make_cache_key(char *key_buff, size_t key_buff_size, char *domain, int port) {
+    snprintf(key_buff, key_buff_size, "%s:%d", domain ? domain : "null", port);
 }
 
 static struct cache_data *
@@ -23,7 +33,7 @@ make_cache_data(struct host_info *hi, size_t time) {
     struct cache_data *data;
     data = malloc(sizeof(*data));
     if(data) {
-        data->hi = hi;  /* hold, should free it at last.*/
+        data->hi = hi;  /* hold, should free at last.*/
         data->expire_time = /*curtime*/ + time;
     }
     return data;
@@ -44,9 +54,11 @@ static void free_value(void *value) {
 }
 
 static void
-cache_remove(char *domain) {
-    if(cache) {
-        map_remove(cache, domain);
+cache_remove(char *domain, int port) {
+    char key_buff[KEY_BUFF_SIZE] = {0};
+    if(cache && domain) {
+        make_cache_key(key_buff, KEY_BUFF_SIZE, domain, port);
+        map_remove(cache, key_buff);
     }
 }
 
@@ -58,27 +70,31 @@ cache_clear() {
 }
 
 static struct cache_data * 
-cache_get(char *domain) {
-    if(domain && cache) {
-        return map_get(cache, domain); 
+cache_get(char *domain, int port) {
+    char key_buff[KEY_BUFF_SIZE] = {0};
+    if(cache && domain) {
+        make_cache_key(key_buff, KEY_BUFF_SIZE, domain, port);
+        return map_get(cache, key_buff); 
     }
     return NULL;
 }
 
 static int
-cache_set(char *domain, void *hi, size_t time) {
+cache_set(char *domain, int port, void *hi, size_t time) {
+    char key_buff[KEY_BUFF_SIZE] = {0};
     struct cache_data *data;
     char *key;
     int ret;
 
     if(!domain) return -1;
-    cache_remove(domain);
+    cache_remove(domain, port);
     if(!cache) {
-        cache = map_new(6, free_key, free_value);
+        cache = map_new(10, free_key, free_value);
     }
     if(!cache) return -1;
 
-    key = strdup(domain);
+    make_cache_key(key_buff, KEY_BUFF_SIZE, domain, port);
+    key = strdup(key_buff);
     if(!key) return -1;
 
     data = make_cache_data(hi, time);
@@ -90,7 +106,7 @@ cache_set(char *domain, void *hi, size_t time) {
     ret = map_set(cache, key, data);
     if(ret != 0) {
         free_key(key);
-        free_value(data);
+        free(data);  /* 如果缓存失败，应保持对外不变(由外部释放data->hi)。 */
     }
     return ret;
 }

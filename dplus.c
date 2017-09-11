@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <pthread.h>
 
 #ifdef WIN32
 #include <winsock2.h>
@@ -429,7 +430,7 @@ dp_getaddrinfo(const char *node, const char *service,
 
     cache_lock();
 
-    c_data = cache_get((char *)node);
+    c_data = cache_get((char *)node, ntohs(port));
     if(c_data) {
         hi = c_data->hi;
         /* 判断是否过期 */
@@ -456,7 +457,7 @@ dp_getaddrinfo(const char *node, const char *service,
     printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
 
     if(ret == 0) {
-        if(cache_set((char *)node, hi, 60*60) != 0) {
+        if(cache_set((char *)node, ntohs(port), hi, 60*60) != 0) {
             host_info_clear(hi);
         }
     }
