@@ -81,7 +81,8 @@ malloc_addrinfo_w(int port, uint32_t addr, int socktype, int proto) {
     return ai;
 }
 
-void print_addrinfo_w(struct addrinfoW *ai) {
+void
+print_addrinfo_w(struct addrinfoW *ai) {
     if(ai) {
 		printf("addrinfoW: %p\n", (void *)ai);
         printf("ai_flags = %d\n", ai->ai_flags);
@@ -228,8 +229,10 @@ dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
         }
     }
 
-    if (service != NULL && service[0] == '*' && service[1] == 0)
+    if (service != NULL && service[0] == '*' && service[1] == 0) {
+        free(service);
         service = NULL;
+    }
 
     if (service != NULL) {
         if (is_integer(service))
@@ -318,7 +321,8 @@ RET:
 }
 
 #ifdef __TEST
-void test_w(int argc, char *argv[]) {
+void
+test_w(int argc, char *argv[]) {
     struct addrinfoW hints;
     struct addrinfoW *ailist;
     char *node;

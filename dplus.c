@@ -39,8 +39,8 @@
 
 struct host_info {
     int h_addrtype; /* host address type: AF_INET or AF_INET6 */
-    int h_length; /* length of address in bytes: 
-                     sizeof(struct in_addr) or sizeof(struct in6_addr) */
+    int h_length;   /* length of address in bytes: 
+                       sizeof(struct in_addr) or sizeof(struct in6_addr) */
     int addr_list_len; /* length of addr list */
     char **h_addr_list; /* list of addresses */
 };
@@ -246,7 +246,8 @@ malloc_addrinfo(int port, uint32_t addr, int socktype, int proto) {
     return ai;
 }
 
-void print_addrinfo(struct addrinfo *ai) {
+void 
+print_addrinfo(struct addrinfo *ai) {
     if(ai) {
         printf("addrinfo: %p\n", (void *)ai);
         printf("ai_flags = %d\n", ai->ai_flags);
@@ -282,8 +283,8 @@ dp_freeaddrinfo(struct addrinfo *ai) {
     }
 }
 
-static struct 
-addrinfo *dup_addrinfo(struct addrinfo *ai) {
+static struct addrinfo *
+dup_addrinfo(struct addrinfo *ai) {
     struct addrinfo *cur, *head = NULL, *prev = NULL;
     while (ai != NULL) {
         cur = (struct addrinfo *)malloc(sizeof(struct addrinfo));
@@ -492,7 +493,8 @@ void dp_cache_clear() {
 #include "dplusw.c"
 
 #ifdef __TEST
-void test(int argc, char *argv[]) {
+void
+test(int argc, char *argv[]) {
     struct addrinfo hints;
     struct addrinfo *ailist;
     int ret;
@@ -535,7 +537,8 @@ void test(int argc, char *argv[]) {
     if(ailist) dp_freeaddrinfo(ailist);
 }
 
-int main(int argc, char *argv[]) {
+int
+main(int argc, char *argv[]) {
 #ifdef WIN32
     test_w(argc, argv);
 #else
