@@ -37,7 +37,6 @@ static int equals(char *key1, char *key2) {
 
 static int
 map_init(struct map_t *map, size_t capacity, free_key_f free_k, free_value_f free_v) {
-
     if(!map) return -1;
     map->nodes = malloc(capacity * sizeof(void*));
     if(map->nodes) {
@@ -52,7 +51,6 @@ map_init(struct map_t *map, size_t capacity, free_key_f free_k, free_value_f fre
 
 static void map_clear(struct map_t *map);
 
-/* never used
 static void
 map_unit(struct map_t *map) {
     if(map) {
@@ -60,8 +58,6 @@ map_unit(struct map_t *map) {
         free(map->nodes);
     }
 }
-*/
-
 
 static struct map_t *
 map_new(size_t capacity, free_key_f free_k, free_value_f free_v) {
@@ -76,7 +72,6 @@ map_new(size_t capacity, free_key_f free_k, free_value_f free_v) {
     return map;
 }
 
-/* never used
 static void
 map_delete(struct map_t * map) {
     if(map) {
@@ -84,7 +79,6 @@ map_delete(struct map_t * map) {
         free(map);
     }
 }
-*/
 
 static int
 map_set(struct map_t *map, char *key, void *val) {
@@ -92,11 +86,13 @@ map_set(struct map_t *map, char *key, void *val) {
     int i;
     
     if(!map) return -1;
+    if(!key) return -1;
 
     i = hash(key) % map->capacity;
     if(!map->nodes[i]) {
         n = malloc(sizeof(*n));
         if(!n) return -1;
+        memset(n, 0x00, sizeof(*n));
         map->nodes[i] = n;
     }
     else {
@@ -108,11 +104,19 @@ map_set(struct map_t *map, char *key, void *val) {
             else if(!p->next) {
                 n = malloc(sizeof(*n));
                 if(!n) return -1;
+                memset(n, 0x00, sizeof(*n));
                 p->next = n;
+                break;
             }
         }
     }
-
+    
+    if(n->key != key) {
+        FREE_KEY(map, n->key);
+    }
+    if(n->value != val) {
+        FREE_VALUE(map, n->value);
+    }
     n->key = key;
     n->value = val;
     return 0;
@@ -124,6 +128,7 @@ map_get(struct map_t *map, char *key) {
     int i;
 
     if(!map) return NULL;
+    if(!key) return NULL;
 
     i = hash(key) % map->capacity;
     for(n = map->nodes[i]; n; n = n->next) {
@@ -140,6 +145,7 @@ map_remove(struct map_t *map , char *key) {
     int i;
 
     if(!map) return;
+    if(!key) return;
 
     i = hash(key) % map->capacity;
     for(n = map->nodes[i], pre = NULL; n; pre = n, n = n->next) {
