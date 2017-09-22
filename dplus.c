@@ -28,6 +28,7 @@
 #define NULL 0
 #endif
 
+#include "dplus.h"
 #include "http.c"
 #include "des.c"
 #include "key.c"

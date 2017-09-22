@@ -150,10 +150,12 @@ test_w(int argc, char *argv[]) {
 int
 main(int argc, char *argv[]) {
 #ifdef __WIN32__
+	/*
     test_w(argc, argv);
-    /*
+    */
+	/**/
     test(argc, argv);
-     */
+    /**/
 #else
     test(argc, argv);
 #endif
