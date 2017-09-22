@@ -82,28 +82,6 @@ malloc_addrinfo_w(int port, uint32_t addr, int socktype, int proto) {
 }
 
 void
-print_addrinfo_w(struct addrinfoW *ai) {
-    if(ai) {
-		printf("addrinfoW: %p\n", (void *)ai);
-        printf("ai_flags = %d\n", ai->ai_flags);
-        printf("ai_family = %d\n", ai->ai_family);
-        printf("ai_socktype = %d\n", ai->ai_socktype);
-        printf("ai_protocol = %d\n", ai->ai_protocol);
-        printf("ai_addrlen = %lu\n", (unsigned long)(ai->ai_addrlen) );
-        wprintf(L"ai_canonname = (%p) %s\n", (void*)(ai->ai_canonname), ai->ai_canonname);
-        printf("ai_addr = %p\n", (void *)(ai->ai_addr));
-        printf("ai_next = %p\n", (void*)(ai->ai_next));
-		printf("\n");
-		if(ai->ai_next) {
-			print_addrinfo_w(ai->ai_next);
-		}
-    }
-	else {
-		printf("addrinfoW: %p\n", (void *)ai);
-	}
-}
-
-void
 dp_freeaddrinfo_w(struct addrinfoW *ai) {
     struct addrinfoW *next;
     while (ai != NULL) {
@@ -154,7 +132,6 @@ error:
     }
     return NULL;
 }
-
 
 static int 
 fillin_addrinfoW_res(struct addrinfoW **res, struct host_info *hi,
@@ -320,59 +297,4 @@ RET:
     return ret;
 }
 
-#ifdef __TEST
-void
-test_w(int argc, char *argv[]) {
-    struct addrinfoW hints;
-    struct addrinfoW *ailist;
-    char *node;
-	WCHAR node_w[1024];
-	int ret;
-	
-    WSADATA wsa;
-    WSAStartup(MAKEWORD(2, 2), &wsa);
-
-    if(argc < 2) {
-        node = "www.baidu.com";
-    }
-    else {
-        node = argv[1];
-    }
-
-    MultiByteToWideChar(CP_UTF8,
-            0,
-            node,
-            -1,
-            node_w,
-            1000
-            );
-
-    memset(&hints, 0x00, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = 0;
-
-    ret = dp_getaddrinfo_w(node_w, NULL, &hints, &ailist);
-    printf("ret = %d\n", ret);
-    print_addrinfo_w(ailist); 
-    if(ailist) dp_freeaddrinfo_w(ailist);
-
-    sleep(10);
-
-    ret = dp_getaddrinfo_w(node_w, NULL, &hints, &ailist);
-    printf("ret = %d\n", ret);
-    print_addrinfo_w(ailist); 
-    if(ailist) dp_freeaddrinfo_w(ailist);
-
-    sleep(5);
-
-    ret = dp_getaddrinfo_w(node_w, NULL, &hints, &ailist);
-    printf("ret = %d\n", ret);
-    print_addrinfo_w(ailist); 
-    if(ailist) dp_freeaddrinfo_w(ailist);
-}
-
-#endif
-
-#endif
+#endif  /* __WIN32__ */

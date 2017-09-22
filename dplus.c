@@ -22,7 +22,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/select.h>
-#endif
+#endif  /* __WIN32__ */
 
 #ifndef NULL
 #define NULL 0
@@ -246,29 +246,6 @@ malloc_addrinfo(int port, uint32_t addr, int socktype, int proto) {
     return ai;
 }
 
-void 
-print_addrinfo(struct addrinfo *ai) {
-    if(ai) {
-        printf("addrinfo: %p\n", (void *)ai);
-        printf("ai_flags = %d\n", ai->ai_flags);
-        printf("ai_family = %d\n", ai->ai_family);
-        printf("ai_socktype = %d\n", ai->ai_socktype);
-        printf("ai_protocol = %d\n", ai->ai_protocol);
-        printf("ai_addrlen = %lu\n", (unsigned long) (ai->ai_addrlen));
-        printf("ai_canonname = (%p) %s\n", (void*)(ai->ai_canonname), ai->ai_canonname);
-        printf("ai_addr = %p\n", (void *)(ai->ai_addr));
-        printf("ai_next = %p\n", (void*)(ai->ai_next));
-        printf("\n");
-        if(ai->ai_next) {
-            print_addrinfo(ai->ai_next);
-        }
-    }
-    else {
-        printf("addrinfo: %p\n", (void *)ai);
-    }
-}
-
-
 void
 dp_freeaddrinfo(struct addrinfo *ai) {
     struct addrinfo *next;
@@ -321,7 +298,6 @@ error:
     return NULL;
 }
 
-
 static int 
 fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
     int port, int socktype, int proto) {
@@ -345,8 +321,8 @@ fillin_addrinfo_res(struct addrinfo **res, struct host_info *hi,
 }
 
 int
-dp_getaddrinfo(const char *node, const char *service,
-    const struct addrinfo *hints, struct addrinfo **res) {
+dp_getaddrinfo(const char *node, const char *service, \
+        const struct addrinfo *hints, struct addrinfo **res) {
     struct host_info *hi = NULL;
     int port = 0, socktype, proto, ret = 0;
     time_t ttl, rawtime;
@@ -492,60 +468,3 @@ void dp_cache_clear() {
 
 #include "dplus_wide.c"
 
-#ifdef __TEST
-void
-test(int argc, char *argv[]) {
-    struct addrinfo hints;
-    struct addrinfo *ailist;
-    int ret;
-    char *node;
-    #ifdef __WIN32__
-        WSADATA wsa;
-        WSAStartup(MAKEWORD(2, 2), &wsa);
-    #endif
-
-    if(argc < 2) {
-        node = "api.chivox.com";
-    }
-    else {
-        node = argv[1];
-    }
-
-    memset(&hints, 0x00, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = 0;
-
-    ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
-    printf("ret = %d\n", ret);
-    print_addrinfo(ailist); 
-    if(ailist) dp_freeaddrinfo(ailist);
-
-    sleep(10);
-
-    ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
-    printf("ret = %d\n", ret);
-    print_addrinfo(ailist); 
-    if(ailist) dp_freeaddrinfo(ailist);
-
-    sleep(1);
-
-    ret = dp_getaddrinfo(node, NULL, &hints, &ailist);
-    printf("ret = %d\n", ret);
-    print_addrinfo(ailist); 
-    if(ailist) dp_freeaddrinfo(ailist);
-}
-
-int
-main(int argc, char *argv[]) {
-#ifdef __WIN32__
-    test_w(argc, argv);
-#else
-    test(argc, argv);
-#endif
-    return 0;
-}
-
-
-#endif
