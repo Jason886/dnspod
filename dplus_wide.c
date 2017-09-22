@@ -1,4 +1,4 @@
-#ifdef WIN32
+#ifdef __WIN32__
 
 static size_t 
 strlen_w(LPCWSTR wstr) {

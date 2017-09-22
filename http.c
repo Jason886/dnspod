@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <time.h>
 
-#ifdef WIN32
+#ifdef __WIN32__
     #include <winsock2.h>
     #include <windows.h>
     #include <ws2tcpip.h>
@@ -34,7 +34,7 @@
 
 #define MIN(x,y) (((x)<(y))?(x):(y))
 
-#ifdef WIN32
+#ifdef __WIN32__
 static int inet_pton(int af, const char *src, void *dst) {
     struct sockaddr_storage ss;
     int size = sizeof(ss);
@@ -185,7 +185,7 @@ static int make_connection(char *serv_ip, int port)
     int sockfd, ret;
     struct sockaddr_in serv_addr;
     
-    #ifdef WIN32
+    #ifdef __WIN32__
 	unsigned long mode = 1;
 	#else
 	int flags;
@@ -204,7 +204,7 @@ static int make_connection(char *serv_ip, int port)
         return -1;
     }
 	
-#ifdef WIN32
+#ifdef __WIN32__
 	if(ioctlsocket(sockfd, FIONBIO, (unsigned long *)&mode) != 0) {
 		fprintf(stderr, "ioctlsocket error\n");
         return -1; 
@@ -224,7 +224,7 @@ static int make_connection(char *serv_ip, int port)
     ret = connect(sockfd, (struct sockaddr *)&serv_addr,
         sizeof(struct sockaddr));
     while(ret != 0) {
-		#ifdef WIN32
+		#ifdef __WIN32__
 		if( WSAGetLastError() == WSAEWOULDBLOCK) {
 		#else
         if( errno == EINPROGRESS ) {
@@ -237,7 +237,7 @@ static int make_connection(char *serv_ip, int port)
     }
 
     if(wait_connected(&sockfd) != 0) {
-#ifdef WIN32
+#ifdef __WIN32__
         closesocket(sockfd);
 #else
         close(sockfd);
@@ -354,7 +354,7 @@ static int fetch_response(int sockfd, char *http_data, size_t http_data_len)
 
         key[31] = '\0';
         value[MAXLEN_VALUE - 1] = '\0';
-#ifdef WIN32
+#ifdef __WIN32__
         ret = sscanf(buf, "%31[^:]: %119[^\r\n]", key, 31, value, MAXLEN_VALUE - 1);
 #else
         ret = sscanf(buf, "%31[^:]: %119[^\r\n]", key, value);

@@ -11,7 +11,7 @@
 #include <pthread.h>
 #include <time.h>
 
-#ifdef WIN32
+#ifdef __WIN32__
 #include <winsock2.h>
 #include <windows.h>
 #include <ws2tcpip.h>
@@ -117,7 +117,7 @@ http_query(const char *node, time_t *ttl) {
 
     ret = make_request(sockfd, HTTPDNS_DEFAULT_SERVER, http_data);
     if (ret < 0){
-#ifdef WIN32
+#ifdef __WIN32__
         closesocket(sockfd);
 #else
         close(sockfd);
@@ -126,7 +126,7 @@ http_query(const char *node, time_t *ttl) {
     }
 
     ret = fetch_response(sockfd, http_data, HTTP_DEFAULT_DATA_SIZE);
-#ifdef WIN32
+#ifdef __WIN32__
     closesocket(sockfd);
 #else
     close(sockfd);
@@ -352,14 +352,14 @@ dp_getaddrinfo(const char *node, const char *service,
     time_t ttl, rawtime;
     struct addrinfo *answer;
     struct cache_data * c_data;
-    #ifdef WIN32
+    #ifdef __WIN32__
         WSADATA wsa;
     #endif
 
     if (node == NULL)
         return EAI_NONAME;
 
-    #ifdef WIN32
+    #ifdef __WIN32__
         WSAStartup(MAKEWORD(2, 2), &wsa);
     #endif
 
@@ -478,7 +478,7 @@ SYS_DNS:
     }
 
 RET:
-    #ifdef WIN32
+    #ifdef __WIN32__
         WSACleanup();
     #endif
     return ret;
@@ -490,7 +490,7 @@ void dp_cache_clear() {
     cache_unlock();
 }
 
-#include "dplusw.c"
+#include "dplus_wide.c"
 
 #ifdef __TEST
 void
@@ -499,7 +499,7 @@ test(int argc, char *argv[]) {
     struct addrinfo *ailist;
     int ret;
     char *node;
-    #ifdef WIN32
+    #ifdef __WIN32__
         WSADATA wsa;
         WSAStartup(MAKEWORD(2, 2), &wsa);
     #endif
@@ -539,7 +539,7 @@ test(int argc, char *argv[]) {
 
 int
 main(int argc, char *argv[]) {
-#ifdef WIN32
+#ifdef __WIN32__
     test_w(argc, argv);
 #else
     test(argc, argv);
