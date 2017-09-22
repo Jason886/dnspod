@@ -427,6 +427,7 @@ dp_getaddrinfo(const char *node, const char *service, \
     */
     hi = http_query(node, &ttl);
     if (NULL == hi) {
+        printf("!!! HTTP_DNS FAILED.\n");
         cache_unlock();
         goto SYS_DNS;
     }

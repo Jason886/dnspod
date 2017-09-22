@@ -261,6 +261,7 @@ dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
     */
     hi = http_query(node, &ttl);
     if (NULL == hi) {
+        printf("!!! HTTP_DNS FAILED.\n");
         cache_unlock();
         goto SYS_DNS;
     }
