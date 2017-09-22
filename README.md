@@ -13,7 +13,7 @@
 1.linux:
     gcc -D_GNU_SOURCE -std=c89 -pedantic -Wall -Wextra test_dplus.c dplus.o -o test
 2.mac:
-	gcc -D_GNU_SOURCE -std=c89 -pedantic -Wall -Wextra test_dplus.c dplus.o -o test
+    gcc -D_GNU_SOURCE -std=c89 -pedantic -Wall -Wextra test_dplus.c dplus.o -o test
 3.win:(need mingw)
     gcc -D__WIN32__ -std=c89 -pedantic -Wall -Wextra test_dplus.c dplus.o -o test -l wsock32 -lWs2_32
 	
