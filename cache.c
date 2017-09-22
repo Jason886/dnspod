@@ -50,7 +50,9 @@ static void free_key(char *key) {
 static void free_value(void *value) {
     struct cache_data * data = value;
     if(data) {
-        host_info_clear(data->hi);
+        if(data->hi) {
+            host_info_clear(data->hi);
+        }
         free(data);
     }
 }
