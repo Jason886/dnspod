@@ -172,7 +172,7 @@ dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
 
     WSAStartup(MAKEWORD(2, 2), &wsa);
 
-    printf("!!!! node = %s\n", node);
+    _DPLUS_INFO("!!!! node = %s\n", node);
     *res = NULL;
     
     if (is_address(node) || (hints && (hints->ai_flags & AI_NUMERICHOST)))
@@ -247,7 +247,7 @@ dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
         time(&rawtime);
         if(c_data->expire_time > rawtime) {
             ret = fillin_addrinfoW_res(res, hi, port, socktype, proto);
-            printf("CACHE_DNS: ret = %d, node = %s\n", ret, node);
+            _DPLUS_DEBUG("CACHE_DNS: ret = %d, node = %s\n", ret, node);
             cache_unlock();
             if(ret == 0) goto RET;
             else goto SYS_DNS; 
@@ -261,13 +261,13 @@ dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
     */
     hi = http_query(node, &ttl);
     if (NULL == hi) {
-        printf("!!! HTTP_DNS FAILED.\n");
+        _DPLUS_INFO("!!! HTTP_DNS FAILED.\n");
         cache_unlock();
         goto SYS_DNS;
     }
 
     ret = fillin_addrinfoW_res(res, hi, port, socktype, proto);
-    printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
+    _DPLUS_DEBUG("HTTP_DNS: ret = %d, node = %s\n", ret, node);
 
     /* 缓存时间 3/4*ttl分钟 */
     if(ret != 0 || cache_set((char *)node, ntohs(port), hi, ttl*60/4*3) != 0) {
@@ -280,7 +280,7 @@ dp_getaddrinfo_w(LPCWSTR node_w, LPCWSTR service_w,
 SYS_DNS:
     *res = NULL;
     ret = GetAddrInfoW(node_w, service_w, hints, &answer);
-    printf("SYS_DNS: ret = %d, node = %s\n", ret, node);
+    _DPLUS_DEBUG("SYS_DNS: ret = %d, node = %s\n", ret, node);
     if (ret == 0) {
         *res = dup_addrinfo_w(answer);
         FreeAddrInfoW(answer);

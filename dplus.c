@@ -38,6 +38,7 @@
 #define HTTPDNS_DEFAULT_PORT   80
 #define HTTP_DEFAULT_DATA_SIZE 1024
 
+
 struct host_info {
     int h_addrtype; /* host address type: AF_INET or AF_INET6 */
     int h_length;   /* length of address in bytes: 
@@ -143,7 +144,7 @@ http_query(const char *node, time_t *ttl) {
             return NULL;
         }
         http_data_ptr_head = http_data_ptr;
-        printf("http_data_ptr: %s\n", http_data_ptr);
+        _DPLUS_DEBUG("http_data_ptr: %s\n", http_data_ptr);
     }
     else {
         http_data_ptr = http_data;
@@ -340,7 +341,7 @@ dp_getaddrinfo(const char *node, const char *service, \
         WSAStartup(MAKEWORD(2, 2), &wsa);
     #endif
 
-    printf("!!!! node = %s\n", node);
+    _DPLUS_INFO("!!!! node = %s\n", node);
     *res = NULL;
     
     if (is_address(node) || (hints && (hints->ai_flags & AI_NUMERICHOST)))
@@ -413,7 +414,7 @@ dp_getaddrinfo(const char *node, const char *service, \
         time(&rawtime);
         if(c_data->expire_time > rawtime) {
             ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
-            printf("CACHE_DNS: ret = %d, node = %s\n", ret, node);
+            _DPLUS_DEBUG("CACHE_DNS: ret = %d, node = %s\n", ret, node);
             cache_unlock();
             if(ret == 0) goto RET;
             else goto SYS_DNS; 
@@ -427,13 +428,13 @@ dp_getaddrinfo(const char *node, const char *service, \
     */
     hi = http_query(node, &ttl);
     if (NULL == hi) {
-        printf("!!! HTTP_DNS FAILED.\n");
+        _DPLUS_INFO("!!! HTTP_DNS FAILED.\n");
         cache_unlock();
         goto SYS_DNS;
     }
 
     ret = fillin_addrinfo_res(res, hi, port, socktype, proto);
-    printf("HTTP_DNS: ret = %d, node = %s\n", ret, node);
+    _DPLUS_DEBUG("HTTP_DNS: ret = %d, node = %s\n", ret, node);
 
     /* 缓存时间 3/4*ttl分钟 */
     if(ret != 0 || cache_set((char *)node, ntohs(port), hi, ttl*60/4*3) != 0) {
@@ -446,7 +447,7 @@ dp_getaddrinfo(const char *node, const char *service, \
 SYS_DNS:
     *res = NULL;
     ret = getaddrinfo(node, service, hints, &answer);
-    printf("SYS_DNS: ret = %d, node = %s\n", ret, node);
+    _DPLUS_DEBUG("SYS_DNS: ret = %d, node = %s\n", ret, node);
     if (ret == 0) {
         *res = dup_addrinfo(answer);
         freeaddrinfo(answer);

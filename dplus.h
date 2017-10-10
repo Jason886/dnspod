@@ -7,6 +7,13 @@
 #include <netdb.h>
 #endif
 
+#ifndef NDEBUG
+#define _DPLUS_DEBUG(format, ...) printf(format, ##__VA_ARGS__)
+#else
+#define _DPLUS_DEBUG(format, ...)
+#endif
+#define _DPLUS_INFO(format, ...) printf(format, ##__VA_ARGS__)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
