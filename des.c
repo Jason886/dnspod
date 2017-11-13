@@ -443,7 +443,7 @@ static char * des_decode_hex(char *in_hex, char key[8], size_t *size_out) {
     des(in_bin, size_in, key, &out_bin, &_size_out, 'd');
     free(in_bin);
     out_bin2 = realloc(out_bin, _size_out+1);
-    out_bin2[_size_out+1] = 0;
+    out_bin2[_size_out] = 0;
     if(size_out) *size_out = _size_out;
     return out_bin2;
 }
