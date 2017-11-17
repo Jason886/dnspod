@@ -3,7 +3,7 @@
 
 ## build lib:
 1.linux:
-    gcc -D_GNU_SOURCE -D__TEST -DNDEBUG -std=c99 -pedantic -Wall -Wextra -c -I. dplus.c -o dplus.o
+    gcc -D_GNU_SOURCE -D__TEST -DDEBUG -std=c99 -pedantic -Wall -Wextra -c -I. dplus.c -o dplus.o
 2.mac:
     gcc -D_GNU_SOURCE -D__TEST -DNDEBUG -std=c99 -pedantic -Wall -Wextra -c -I. dplus.c -o dplus.o
 3.win:(need mingw)
