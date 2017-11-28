@@ -159,6 +159,7 @@ map_remove(struct map_t *map , char *key) {
             FREE_KEY(map, n->key);
             FREE_VALUE(map, n->value);
             free(n);
+            return;
         }
    }
 }
